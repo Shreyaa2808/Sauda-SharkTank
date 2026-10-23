@@ -17,7 +17,6 @@
 -- 6) No existing routines, triggers, business tables, or rows are dropped.
 -- ============================================================================
 
-USE sharktank_db;
 
 -- ---------------------------------------------------------------------------
 -- 1. Google identity support
