@@ -27,15 +27,39 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  // Escape closes the dialog; focus moves into it on open.
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Escape closes; Tab is trapped inside the dialog; focus moves in on open and returns to the opener on close.
   useEffect(() => {
     if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
     closeBtnRef.current?.focus();
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
+      if (e.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusables || focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panelRef.current?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !panelRef.current?.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      opener?.focus?.();
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -62,7 +86,7 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
 
   return (
     <div className="workspace-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="workspace-modal-title">
-      <div className="workspace-modal-panel" onClick={(e) => e.stopPropagation()}>
+      <div ref={panelRef} className="workspace-modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="workspace-modal-header">
           <div className="workspace-brand-pill">
             <span className="gold-dot" /> SAUDA WORKSPACE REGISTRY
