@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { AuthUser } from '../../services/auth.ts';
 import { activateWorkspaceRole } from '../../services/workspace.ts';
 import './WorkspaceChooserModal.css';
@@ -20,6 +20,23 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
 }) => {
   const [activatingRole, setActivatingRole] = useState<'FOUNDER' | 'INVESTOR' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Escape closes the dialog; focus moves into it on open.
+  useEffect(() => {
+    if (!isOpen) return;
+    closeBtnRef.current?.focus();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -50,7 +67,7 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
           <div className="workspace-brand-pill">
             <span className="gold-dot" /> SAUDA WORKSPACE REGISTRY
           </div>
-          <button className="workspace-close-btn" onClick={onClose} aria-label="Close workspace chooser">
+          <button ref={closeBtnRef} type="button" className="workspace-close-btn" onClick={onClose} aria-label="Close workspace chooser">
             ✕
           </button>
         </div>

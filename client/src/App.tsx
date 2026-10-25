@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
 import {
   CinematicIntro,
@@ -10,6 +10,7 @@ import { AccountMenu } from './components/auth/AccountMenu.tsx';
 import { ProfilePage } from './components/profile/ProfilePage.tsx';
 import { AccountSettingsPage } from './components/settings/AccountSettingsPage.tsx';
 import { WorkspaceChooserModal } from './components/workspace/WorkspaceChooserModal.tsx';
+import { WorkspaceGate } from './components/workspace/WorkspaceGate.tsx';
 import { FounderWorkspace } from './components/founder/FounderWorkspace.tsx';
 import { InvestorWorkspace } from './components/investor/InvestorWorkspace.tsx';
 import { ConnectionsHub } from './components/connections/ConnectionsHub.tsx';
@@ -29,16 +30,30 @@ import {
 type FilterType = 'ALL' | PitchType;
 type AppRoute = 'discovery' | 'login' | 'profile' | 'settings' | 'founder' | 'investor' | 'connections';
 
+// Single source of truth for the (History API based) route model.
+const ROUTE_PATHS: Record<AppRoute, string> = {
+  discovery: '/',
+  login: '/login',
+  profile: '/profile',
+  settings: '/settings',
+  founder: '/founder',
+  investor: '/investor',
+  connections: '/connections',
+};
+
+// Routes that need a server-verified session. Role checks for workspaces are layered on top.
+const AUTH_REQUIRED_ROUTES: AppRoute[] = ['profile', 'settings', 'founder', 'investor', 'connections'];
+const WORKSPACE_ROUTES: AppRoute[] = ['founder', 'investor', 'connections'];
+
+const pathToRoute = (rawPath: string): AppRoute => {
+  const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
+  const match = (Object.keys(ROUTE_PATHS) as AppRoute[]).find((r) => ROUTE_PATHS[r] === path);
+  return match ?? 'discovery';
+};
+
 const getInitialRoute = (): AppRoute => {
   if (typeof window === 'undefined') return 'discovery';
-  const path = window.location.pathname;
-  if (path === '/login') return 'login';
-  if (path === '/profile') return 'profile';
-  if (path === '/settings') return 'settings';
-  if (path === '/founder') return 'founder';
-  if (path === '/investor') return 'investor';
-  if (path === '/connections') return 'connections';
-  return 'discovery';
+  return pathToRoute(window.location.pathname);
 };
 
 const checkIntroEligible = (): boolean => {
@@ -73,7 +88,7 @@ export const App: React.FC = () => {
 
   // Authentication & Access Routing State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>(getInitialRoute);
+  const [requestedRoute, setRequestedRoute] = useState<AppRoute>(getInitialRoute);
   // Workspace Chooser Modal State
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState<boolean>(false);
 
@@ -83,72 +98,43 @@ export const App: React.FC = () => {
   const [isMatrixOpen, setIsMatrixOpen] = useState<boolean>(false);
   const [compareWarning, setCompareWarning] = useState<string | null>(null);
 
-  // Navigation helper synchronized with browser History API
-  const navigateTo = (route: AppRoute) => {
-    setCurrentRoute(route);
-    let path = '/';
-    if (route === 'login') path = '/login';
-    else if (route === 'profile') path = '/profile';
-    else if (route === 'settings') path = '/settings';
-    else if (route === 'founder') path = '/founder';
-    else if (route === 'investor') path = '/investor';
-    else if (route === 'connections') path = '/connections';
-    // 'discovery' → '/'
-
+  // Navigation helper synchronized with browser History API.
+  // `replace` is used for guard redirects so Back never lands on a page the guard just rejected.
+  const navigateTo = useCallback((route: AppRoute, replace = false) => {
+    setRequestedRoute(route);
+    const path = ROUTE_PATHS[route];
     if (window.location.pathname !== path) {
-      window.history.pushState(null, '', path);
+      if (replace) window.history.replaceState(null, '', path);
+      else window.history.pushState(null, '', path);
     }
-  };
+    window.scrollTo?.({ top: 0 });
+  }, []);
+
+  // Route to resume after a guard-triggered sign-in (never trusted for authorization).
+  const returnToRef = React.useRef<AppRoute | null>(null);
 
   // Synchronize browser back/forward buttons with currentRoute
   useEffect(() => {
     const handlePopState = () => {
-      const path = window.location.pathname;
-      let nextRoute: AppRoute = 'discovery';
-      if (path === '/login') nextRoute = 'login';
-      else if (path === '/profile') nextRoute = 'profile';
-      else if (path === '/settings') nextRoute = 'settings';
-      else if (path === '/founder') nextRoute = 'founder';
-      else if (path === '/investor') nextRoute = 'investor';
-      else if (path === '/connections') nextRoute = 'connections';
-      setCurrentRoute(nextRoute);
+      setRequestedRoute(pathToRoute(window.location.pathname));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Check authenticated session cookie on mount
+  // Check authenticated session cookie on mount (server is the source of truth for identity + roles)
   useEffect(() => {
     let mounted = true;
     checkSession()
       .then((session) => {
         if (!mounted) return;
-        if (session.authenticated && session.user) {
-          setCurrentUser(session.user);
-        } else {
-          setCurrentUser(null);
-          // If on a protected route without session, route to login
-          const path = window.location.pathname;
-          const protectedPaths = ['/profile', '/settings', '/founder', '/investor', '/connections'];
-          if (protectedPaths.includes(path)) {
-            navigateTo('login');
-          }
-        }
+        setCurrentUser(session.authenticated && session.user ? session.user : null);
       })
       .catch(() => {
-        if (mounted) {
-          setCurrentUser(null);
-          const path = window.location.pathname;
-          const protectedPaths = ['/profile', '/settings', '/founder', '/investor', '/connections'];
-          if (protectedPaths.includes(path)) {
-            navigateTo('login');
-          }
-        }
+        if (mounted) setCurrentUser(null);
       })
       .finally(() => {
-        if (mounted) {
-          setIsInitialAuthDone(true);
-        }
+        if (mounted) setIsInitialAuthDone(true);
       });
 
     return () => {
@@ -160,6 +146,54 @@ export const App: React.FC = () => {
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
+
+  // Route guard: derived during render so direct URL entry, refresh, Back/Forward and logout
+  // can never display a protected view without a server-verified session.
+  const guardRedirect: AppRoute | null = !isInitialAuthDone
+    ? null
+    : !currentUser && AUTH_REQUIRED_ROUTES.includes(requestedRoute)
+      ? 'login'
+      : currentUser && requestedRoute === 'login'
+        ? 'discovery'
+        : null;
+  const currentRoute: AppRoute = guardRedirect ?? requestedRoute;
+
+  // Keep the address bar in step with a guard redirect (history only; no state updates here).
+  useEffect(() => {
+    if (!guardRedirect) return;
+    if (guardRedirect === 'login') returnToRef.current = requestedRoute;
+    const path = ROUTE_PATHS[guardRedirect];
+    if (window.location.pathname !== path) window.history.replaceState(null, '', path);
+  }, [guardRedirect, requestedRoute]);
+
+  // Re-verify roles with the server whenever a workspace route is entered, so a stale
+  // client-side role list (e.g. activated or revoked in another tab) never decides access.
+  const currentUserId = currentUser?.userId ?? null;
+  useEffect(() => {
+    if (currentUserId === null || !WORKSPACE_ROUTES.includes(currentRoute)) return;
+    const controller = new AbortController();
+    checkSession(controller.signal)
+      .then((session) => {
+        if (controller.signal.aborted) return;
+        if (!session.authenticated || !session.user) {
+          setCurrentUser(null);
+          return;
+        }
+        const fresh = session.user;
+        setCurrentUser((prev) => {
+          if (!prev || prev.userId !== fresh.userId) return prev;
+          const same =
+            prev.roles.length === fresh.roles.length && prev.roles.every((r) => fresh.roles.includes(r));
+          return same ? prev : { ...prev, roles: fresh.roles };
+        });
+      })
+      .catch(() => {
+        /* aborted or offline: keep current state; backend still enforces authorization */
+      });
+    return () => controller.abort();
+  }, [currentRoute, currentUserId]);
+
+  const hasRole = (role: string): boolean => Boolean(currentUser?.roles.includes(role));
 
   // Initial app bootstrap is pending when auth session is unresolved OR
   // (if on discovery route, initial startup data is still loading without error)
@@ -177,38 +211,37 @@ export const App: React.FC = () => {
     } catch {
       // Ignore if sessionStorage is restricted
     }
-    // If authenticated session exists, allow entry to requested route or discovery; otherwise, display login page
+    // Signed-out visitors land on the login page (guest entry is offered there);
+    // signed-in users continue to the URL they requested. Guards enforce the rest.
     if (!currentUserRef.current) {
-      navigateTo('login');
+      navigateTo('login', true);
     } else {
-      const path = window.location.pathname;
-      if (path === '/profile') {
-        navigateTo('profile');
-      } else if (path === '/settings') {
-        navigateTo('settings');
-      } else if (path === '/founder') {
-        navigateTo('founder');
-      } else if (path === '/investor') {
-        navigateTo('investor');
-      } else if (path === '/connections') {
-        navigateTo('connections');
-      } else {
-        navigateTo('discovery');
-      }
+      navigateTo(pathToRoute(window.location.pathname), true);
     }
   };
 
   // Logout handler
   const handleLogout = async () => {
     await logout();
+    returnToRef.current = null;
+    setIsWorkspaceModalOpen(false);
     setCurrentUser(null);
     navigateTo('login');
   };
 
-  // Login success handler
+  // Login success handler: resume the originally requested route when there was one
   const handleLoginSuccess = (user: AuthUser) => {
     setCurrentUser(user);
-    navigateTo('discovery');
+    const resume = returnToRef.current;
+    returnToRef.current = null;
+    navigateTo(resume ?? 'discovery');
+  };
+
+  const gateProps = {
+    isSignedIn: Boolean(currentUser),
+    onSignIn: () => navigateTo('login'),
+    onOpenWorkspaces: () => setIsWorkspaceModalOpen(true),
+    onReturnToDiscovery: () => navigateTo('discovery'),
   };
 
   // Load real published startup pitches from backend API
@@ -429,10 +462,61 @@ export const App: React.FC = () => {
           >
             Startup Explorer
           </a>
+          {currentUser && hasRole('FOUNDER') && (
+            <a
+              className={`nav-link ${currentRoute === 'founder' ? 'active' : ''}`}
+              href="/founder"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateTo('founder');
+              }}
+              aria-current={currentRoute === 'founder' ? 'page' : undefined}
+            >
+              Founder
+            </a>
+          )}
+          {currentUser && hasRole('INVESTOR') && (
+            <a
+              className={`nav-link ${currentRoute === 'investor' ? 'active' : ''}`}
+              href="/investor"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateTo('investor');
+              }}
+              aria-current={currentRoute === 'investor' ? 'page' : undefined}
+            >
+              Deal Room
+            </a>
+          )}
+          {currentUser && (hasRole('FOUNDER') || hasRole('INVESTOR')) && (
+            <a
+              className={`nav-link ${currentRoute === 'connections' ? 'active' : ''}`}
+              href="/connections"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateTo('connections');
+              }}
+              aria-current={currentRoute === 'connections' ? 'page' : undefined}
+            >
+              Connections
+            </a>
+          )}
         </nav>
 
         <div className="topbar-right">
           {/* Real Authentication State: Account Menu or Sign In CTA */}
+          {currentUser && (
+            <button
+              type="button"
+              className="topbar-workspace-btn"
+              onClick={() => setIsWorkspaceModalOpen(true)}
+              aria-haspopup="dialog"
+              title="Switch or activate a workspace"
+            >
+              <span aria-hidden="true">▦</span>
+              <span>Workspaces</span>
+            </button>
+          )}
           {currentUser ? (
             <AccountMenu
               user={currentUser}
@@ -470,10 +554,10 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* 2. DYNAMIC ROUTE VIEWS: PROFILE, SETTINGS, OR DISCOVERY */}
-      {currentRoute === 'profile' && (
+      {/* 2. DYNAMIC ROUTE VIEWS: PROFILE, SETTINGS, WORKSPACES (guarded), OR DISCOVERY */}
+      {currentRoute === 'profile' && currentUser && (
         <ProfilePage
-          currentUser={currentUser || { userId: 0, fullName: 'User', email: '', roles: ['VIEWER'] }}
+          currentUser={currentUser}
           onNavigate={navigateTo}
           onProfileUpdated={(updated) => {
             setCurrentUser((prev) => (prev ? { ...prev, fullName: updated.fullName } : null));
@@ -481,191 +565,64 @@ export const App: React.FC = () => {
         />
       )}
 
-      {currentRoute === 'settings' && (
+      {currentRoute === 'settings' && currentUser && (
         <AccountSettingsPage
-          currentUser={currentUser || { userId: 0, fullName: 'User', email: '', roles: ['VIEWER'] }}
+          currentUser={currentUser}
           onNavigate={navigateTo}
           onSignOut={handleLogout}
         />
       )}
 
-      {/* FOUNDER WORKSPACE ROUTE */}
-      {currentRoute === 'founder' && (
-        currentUser ? (
-          currentUser.roles.includes('FOUNDER') ? (
-            <FounderWorkspace
-              onNavigateToConnections={() => navigateTo('connections')}
-              onNavigateToDiscovery={() => navigateTo('discovery')}
-            />
-          ) : (
-            /* Role not yet activated — show onboarding panel */
-            <div className="workspace-gate-page">
-              <div className="workspace-gate-inner">
-                <div className="gate-eyebrow">
-                  <span className="gate-dot" />
-                  FOUNDER WORKSPACE
-                </div>
-                <h2>Founder Access Required</h2>
-                <p>
-                  Your account does not yet have Founder workspace permissions. Activate the Founder
-                  suite to create and manage your startup listings on Sauda.
-                </p>
-                <button
-                  type="button"
-                  className="gate-activate-btn"
-                  onClick={() => setIsWorkspaceModalOpen(true)}
-                >
-                  Activate Founder Workspace →
-                </button>
-                <button
-                  type="button"
-                  className="gate-discover-link"
-                  onClick={() => navigateTo('discovery')}
-                >
-                  ← Return to Startup Discovery
-                </button>
-              </div>
-            </div>
-          )
+      {/* Workspace routes: rendered only once the server session has resolved. The role check
+          here is a UX guard; every workspace API call is independently authorized by the backend. */}
+      {isInitialAuthDone && currentRoute === 'founder' && (
+        currentUser && hasRole('FOUNDER') ? (
+          <FounderWorkspace
+            onNavigateToConnections={() => navigateTo('connections')}
+            onNavigateToDiscovery={() => navigateTo('discovery')}
+          />
         ) : (
-          /* Not signed in — redirect panel */
-          <div className="workspace-gate-page">
-            <div className="workspace-gate-inner">
-              <h2>Sign In Required</h2>
-              <p>You must be signed in to access the Founder Workspace.</p>
-              <button
-                type="button"
-                className="gate-activate-btn"
-                onClick={() => navigateTo('login')}
-              >
-                Sign In →
-              </button>
-            </div>
-          </div>
+          <WorkspaceGate {...gateProps} kind="founder" />
         )
       )}
 
-      {/* INVESTOR WORKSPACE ROUTE */}
-      {currentRoute === 'investor' && (
-        currentUser ? (
-          currentUser.roles.includes('INVESTOR') ? (
-            <InvestorWorkspace
-              onNavigateToConnections={() => navigateTo('connections')}
-              onNavigateToDiscovery={() => navigateTo('discovery')}
-            />
-          ) : (
-            <div className="workspace-gate-page">
-              <div className="workspace-gate-inner">
-                <div className="gate-eyebrow">
-                  <span className="gate-dot" />
-                  INVESTOR DEAL ROOM
-                </div>
-                <h2>Investor Access Required</h2>
-                <p>
-                  Your account does not yet have Investor workspace permissions. Activate the Investor
-                  suite to access the deal room, evaluate ventures, and initiate connections.
-                </p>
-                <button
-                  type="button"
-                  className="gate-activate-btn"
-                  onClick={() => setIsWorkspaceModalOpen(true)}
-                >
-                  Activate Investor Workspace →
-                </button>
-                <button
-                  type="button"
-                  className="gate-discover-link"
-                  onClick={() => navigateTo('discovery')}
-                >
-                  ← Return to Startup Discovery
-                </button>
-              </div>
-            </div>
-          )
+      {isInitialAuthDone && currentRoute === 'investor' && (
+        currentUser && hasRole('INVESTOR') ? (
+          <InvestorWorkspace
+            onNavigateToConnections={() => navigateTo('connections')}
+            onNavigateToDiscovery={() => navigateTo('discovery')}
+          />
         ) : (
-          <div className="workspace-gate-page">
-            <div className="workspace-gate-inner">
-              <h2>Sign In Required</h2>
-              <p>You must be signed in to access the Investor Workspace.</p>
-              <button
-                type="button"
-                className="gate-activate-btn"
-                onClick={() => navigateTo('login')}
-              >
-                Sign In →
-              </button>
-            </div>
-          </div>
+          <WorkspaceGate {...gateProps} kind="investor" />
         )
       )}
 
-      {/* CONNECTIONS HUB ROUTE */}
-      {currentRoute === 'connections' && (
-        currentUser ? (
-          (currentUser.roles.includes('FOUNDER') || currentUser.roles.includes('INVESTOR')) ? (
-            <ConnectionsHub
-              currentUser={currentUser}
-              onNavigateToDiscovery={() => navigateTo('discovery')}
-            />
-          ) : (
-            <div className="workspace-gate-page">
-              <div className="workspace-gate-inner">
-                <div className="gate-eyebrow">
-                  <span className="gate-dot" />
-                  CONNECTIONS HUB
-                </div>
-                <h2>Workspace Role Required</h2>
-                <p>
-                  The Connections Hub is available to Founders and Investors. Activate a workspace role
-                  to manage connection requests and conversations.
-                </p>
-                <button
-                  type="button"
-                  className="gate-activate-btn"
-                  onClick={() => setIsWorkspaceModalOpen(true)}
-                >
-                  Activate a Workspace →
-                </button>
-                <button
-                  type="button"
-                  className="gate-discover-link"
-                  onClick={() => navigateTo('discovery')}
-                >
-                  ← Return to Startup Discovery
-                </button>
-              </div>
-            </div>
-          )
+      {isInitialAuthDone && currentRoute === 'connections' && (
+        currentUser && (hasRole('FOUNDER') || hasRole('INVESTOR')) ? (
+          <ConnectionsHub
+            currentUser={currentUser}
+            onNavigateToDiscovery={() => navigateTo('discovery')}
+          />
         ) : (
-          <div className="workspace-gate-page">
-            <div className="workspace-gate-inner">
-              <h2>Sign In Required</h2>
-              <p>You must be signed in to access the Connections Hub.</p>
-              <button
-                type="button"
-                className="gate-activate-btn"
-                onClick={() => navigateTo('login')}
-              >
-                Sign In →
-              </button>
-            </div>
-          </div>
+          <WorkspaceGate {...gateProps} kind="connections" />
         )
       )}
 
       {/* WORKSPACE CHOOSER MODAL */}
-      <WorkspaceChooserModal
-        currentUser={currentUser}
-        isOpen={isWorkspaceModalOpen}
-        onClose={() => setIsWorkspaceModalOpen(false)}
-        onSelectWorkspace={(workspace) => {
-          setIsWorkspaceModalOpen(false);
-          navigateTo(workspace);
-        }}
-        onRolesUpdated={(updatedRoles) => {
-          setCurrentUser((prev) => (prev ? { ...prev, roles: updatedRoles } : null));
-        }}
-      />
+      {isWorkspaceModalOpen && (
+        <WorkspaceChooserModal
+          currentUser={currentUser}
+          isOpen={isWorkspaceModalOpen}
+          onClose={() => setIsWorkspaceModalOpen(false)}
+          onSelectWorkspace={(workspace) => {
+            setIsWorkspaceModalOpen(false);
+            navigateTo(workspace);
+          }}
+          onRolesUpdated={(updatedRoles) => {
+            setCurrentUser((prev) => (prev ? { ...prev, roles: updatedRoles } : null));
+          }}
+        />
+      )}
 
       {currentRoute === 'discovery' && (
         <>

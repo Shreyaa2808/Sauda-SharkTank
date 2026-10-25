@@ -81,6 +81,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
   const initial = user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U';
   const primaryRole = user.roles && user.roles.length > 0 ? user.roles[0] : 'VIEWER';
+  const roleLabel = user.roles && user.roles.length > 0 ? user.roles.join(' · ') : 'VIEWER';
   const hasFounder = user.roles && user.roles.includes('FOUNDER');
   const hasInvestor = user.roles && user.roles.includes('INVESTOR');
 
@@ -139,7 +140,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               <span className="dropdown-user-email">{user.email}</span>
               <div className="dropdown-role-pill">
                 <span className="role-dot" />
-                <span>{primaryRole}</span>
+                <span>{roleLabel}</span>
               </div>
             </div>
           </div>
