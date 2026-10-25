@@ -1,0 +1,335 @@
+/* ==========================================================================
+   WORKSPACE CHOOSER MODAL: ONBOARDING & ENVIRONMENT SELECTION
+   ========================================================================== */
+
+.workspace-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background-color: rgba(4, 16, 31, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.workspace-modal-panel {
+  position: relative;
+  background: #071C33;
+  border: 1px solid rgba(195, 160, 100, 0.3);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 36px;
+  box-sizing: border-box;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(195, 160, 100, 0.1);
+  color: #ffffff;
+  animation: workspaceFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes workspaceFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.workspace-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.workspace-brand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(195, 160, 100, 0.12);
+  border: 1px solid rgba(195, 160, 100, 0.25);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #C3A064;
+  font-weight: 600;
+}
+
+.gold-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #C3A064;
+  box-shadow: 0 0 8px #C3A064;
+}
+
+.workspace-close-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.85rem;
+}
+
+.workspace-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.workspace-modal-heading {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.85rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+}
+
+.workspace-modal-sub {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 28px 0;
+  max-width: 650px;
+}
+
+.workspace-error-banner {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.workspace-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.workspace-card {
+  background: rgba(10, 39, 71, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: all 0.22s ease;
+}
+
+.workspace-card:hover {
+  background: rgba(10, 39, 71, 0.75);
+  border-color: rgba(195, 160, 100, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
+.workspace-card.active-card {
+  border-color: rgba(195, 160, 100, 0.3);
+}
+
+.workspace-card-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.workspace-card-badge.authorized {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.workspace-card-badge.available {
+  background: rgba(195, 160, 100, 0.15);
+  color: #F3E7CA;
+  border: 1px solid rgba(195, 160, 100, 0.3);
+}
+
+.workspace-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 18px;
+}
+
+.workspace-card-icon.gold-icon {
+  background: rgba(195, 160, 100, 0.12);
+  border-color: rgba(195, 160, 100, 0.3);
+  color: #C3A064;
+}
+
+.workspace-card-icon.blue-icon {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.3);
+  color: #38bdf8;
+}
+
+.workspace-card-title {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 10px 0;
+  color: #ffffff;
+}
+
+.workspace-card-desc {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 24px 0;
+  flex-grow: 1;
+}
+
+.workspace-card-footer {
+  margin-top: auto;
+}
+
+.workspace-action-btn {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.workspace-action-btn.primary {
+  background: #C3A064;
+  border: 1px solid #C3A064;
+  color: #071C33;
+}
+
+.workspace-action-btn.primary:hover {
+  background: #d8b87d;
+  border-color: #d8b87d;
+  box-shadow: 0 4px 14px rgba(195, 160, 100, 0.35);
+}
+
+.workspace-action-btn.secondary {
+  background: transparent;
+  border: 1px solid rgba(195, 160, 100, 0.4);
+  color: #F3E7CA;
+}
+
+.workspace-action-btn.secondary:hover:not(:disabled) {
+  background: rgba(195, 160, 100, 0.15);
+  border-color: #C3A064;
+  color: #ffffff;
+}
+
+.workspace-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.workspace-connections-shortcut {
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.shortcut-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.shortcut-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+.shortcut-desc {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.workspace-shortcut-btn {
+  background: transparent;
+  border: 1px solid rgba(14, 165, 233, 0.4);
+  color: #38bdf8;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.workspace-shortcut-btn:hover {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 860px) {
+  .workspace-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .workspace-modal-panel {
+    padding: 24px 20px;
+  }
+  .workspace-connections-shortcut {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .workspace-shortcut-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

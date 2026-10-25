@@ -1,0 +1,456 @@
+/* ==========================================================================
+   Sauda — Unified Full-Screen Cinematic Stage & Dissolve Transitions
+   ========================================================================== */
+
+/* 1. Full-Screen Cinematic Stage: Fills 100svh/100dvh with zero letterbox padding */
+.cinematic-intro-stage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100svh;
+  height: 100dvh;
+  height: 100vh;
+  z-index: 9999;
+  background: #02070D;
+  color: #FFFFFF;
+  overflow: hidden;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Coordinated Exit: Scene darkens slightly before revealing dashboard */
+.cinematic-intro-stage.fade-out.mode-enter {
+  opacity: 0;
+  background-color: #000000;
+  transition: opacity 450ms cubic-bezier(0.4, 0, 0.2, 1) 120ms;
+  pointer-events: none;
+}
+
+.cinematic-intro-stage.fade-out.mode-skip {
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+
+/* 2. Top Progress Sweep: Clean minimal gold rule at topmost screen edge */
+.intro-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2.5px;
+  background: linear-gradient(90deg, #168DA4 0%, #C3A064 70%, #FFFFFF 100%);
+  z-index: 30;
+  box-shadow: 0 0 10px rgba(195, 160, 100, 0.6);
+  transition: width 60ms linear;
+}
+
+/* 3. Floating Bottom-Right Skip Intro Control with Safe Area Support */
+.intro-skip-wrapper {
+  position: absolute;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  right: max(24px, env(safe-area-inset-right));
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.skip-intro-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: var(--radius-full, 9999px);
+  background: rgba(10, 25, 41, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(195, 160, 100, 0.35);
+  color: #F8FAFC;
+  font-family: var(--font-sans, sans-serif);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transition: all 180ms ease;
+  pointer-events: auto;
+}
+
+.skip-intro-btn:hover:not(:disabled) {
+  background: rgba(19, 43, 64, 0.95);
+  border-color: #C3A064;
+  color: #FFFFFF;
+  box-shadow: 0 0 18px rgba(195, 160, 100, 0.35);
+  transform: translateY(-1px);
+}
+
+.skip-intro-btn:focus-visible {
+  outline: 2px solid #C3A064;
+  outline-offset: 3px;
+}
+
+.skip-key-hint {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(195, 160, 100, 0.18);
+  border: 1px solid rgba(195, 160, 100, 0.35);
+  color: #E2C997;
+}
+
+.skip-arrow {
+  color: #C3A064;
+  font-size: 13px;
+  transition: transform 180ms ease;
+}
+
+.skip-intro-btn:hover:not(:disabled) .skip-arrow {
+  transform: translateX(2px);
+}
+
+/* 4. Full-Stage Background Video: Covers entire viewport without layout banding */
+.intro-video-element {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.29);
+  transform-origin: center center;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+.intro-video-element.visible {
+  opacity: 1;
+}
+
+/* 5. Subtle Radial Scrim: Subtly dims investor chairs so typography has crisp contrast */
+.intro-scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 75% 65% at 50% 50%, rgba(2, 7, 13, 0.72) 0%, rgba(2, 7, 13, 0.42) 60%, rgba(2, 7, 13, 0.15) 100%);
+  opacity: 0;
+  transition: opacity 800ms ease;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.intro-scrim.active {
+  opacity: 1;
+}
+
+/* 6. Filmic Vignette Edge Softener */
+.intro-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 95% 85% at 50% 50%, transparent 55%, rgba(2, 7, 13, 0.85) 100%);
+  z-index: 4;
+}
+
+/* 7. Centered Stage Area for Title Sequence */
+.intro-center-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px clamp(16px, 4vw, 40px);
+  pointer-events: none;
+}
+
+.intro-reveal-centerpiece {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 860px;
+  width: 100%;
+  pointer-events: none;
+}
+
+/* Initial state of children before reveal */
+.intro-reveal-centerpiece .intro-emblem,
+.intro-reveal-centerpiece .intro-wordmark,
+.intro-reveal-centerpiece .intro-subtitle,
+.intro-reveal-centerpiece .intro-tagline,
+.intro-reveal-centerpiece .enter-platform-btn-container {
+  opacity: 0;
+  filter: blur(10px);
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   ORDERED DISSOLVE-IN ANIMATION SEQUENCE
+   1. Emblem (0ms)
+   2. SAUDA Wordmark (120ms)
+   3. Subtitle (240ms)
+   4. Tagline (360ms)
+   5. CTA Button (480ms)
+   ========================================================================== */
+.intro-reveal-centerpiece.revealed .intro-emblem {
+  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 0ms forwards;
+}
+
+.intro-reveal-centerpiece.revealed .intro-wordmark {
+  animation: title-dissolve-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 120ms forwards;
+}
+
+.intro-reveal-centerpiece.revealed .intro-subtitle {
+  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 240ms forwards;
+}
+
+.intro-reveal-centerpiece.revealed .intro-tagline {
+  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 360ms forwards;
+}
+
+.intro-reveal-centerpiece.revealed .enter-platform-btn-container {
+  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 480ms forwards;
+  pointer-events: auto;
+}
+
+@keyframes title-dissolve-in {
+  0% {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   COORDINATED EXIT DISSOLVE ANIMATION SEQUENCE (ON ENTER)
+   Button fades first -> Tagline -> Subtitle -> Wordmark -> Emblem
+   ========================================================================== */
+.intro-reveal-centerpiece.dissolve-out .enter-platform-btn-container {
+  animation: title-dissolve-out 260ms cubic-bezier(0.4, 0, 0.2, 1) 0ms forwards;
+  pointer-events: none;
+}
+
+.intro-reveal-centerpiece.dissolve-out .intro-tagline {
+  animation: title-dissolve-out 280ms cubic-bezier(0.4, 0, 0.2, 1) 40ms forwards;
+}
+
+.intro-reveal-centerpiece.dissolve-out .intro-subtitle {
+  animation: title-dissolve-out 300ms cubic-bezier(0.4, 0, 0.2, 1) 80ms forwards;
+}
+
+.intro-reveal-centerpiece.dissolve-out .intro-wordmark {
+  animation: title-dissolve-out 340ms cubic-bezier(0.4, 0, 0.2, 1) 130ms forwards;
+}
+
+.intro-reveal-centerpiece.dissolve-out .intro-emblem {
+  animation: title-dissolve-out 280ms cubic-bezier(0.4, 0, 0.2, 1) 170ms forwards;
+}
+
+@keyframes title-dissolve-out {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(-8px);
+  }
+}
+
+/* Order 1: Brand Emblem */
+.intro-emblem {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: rgba(10, 25, 41, 0.7);
+  border: 1px solid rgba(195, 160, 100, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  margin-bottom: 12px;
+}
+
+/* Order 2: SAUDA Wordmark */
+.intro-wordmark {
+  font-family: var(--font-editorial, 'Newsreader', 'Fraunces', Georgia, serif);
+  font-size: clamp(52px, 8.5vw, 98px);
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  color: #F8FAFC;
+  margin: 0;
+  text-transform: uppercase;
+  text-shadow: 0 8px 30px rgba(0, 0, 0, 0.85);
+}
+
+.wordmark-dot {
+  color: var(--gold-accent, #C3A064);
+}
+
+/* Order 3: THE STARTUP EXCHANGE Subtitle */
+.intro-subtitle {
+  font-family: var(--font-sans, sans-serif);
+  font-size: clamp(11.5px, 1.4vw, 15px);
+  font-weight: 750;
+  letter-spacing: 0.32em;
+  color: var(--gold-accent, #C3A064);
+  margin-top: 14px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+/* Order 4: Supporting Institutional Tagline */
+.intro-tagline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.tagline-dash {
+  width: 24px;
+  height: 1px;
+  background: var(--gold-accent, #C3A064);
+}
+
+.tagline-text {
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  color: rgba(248, 250, 252, 0.72);
+  text-transform: uppercase;
+}
+
+/* Order 5: Enter Platform Action Button */
+.enter-platform-btn-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 36px;
+}
+
+.enter-platform-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 36px;
+  border-radius: var(--radius-sm, 6px);
+  background: #0A1929;
+  border: 1.5px solid var(--gold-accent, #C3A064);
+  color: #FFFFFF;
+  font-family: var(--font-sans, sans-serif);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 20px rgba(195, 160, 100, 0.25);
+  transition: all 180ms ease;
+}
+
+.enter-platform-btn:hover:not(:disabled) {
+  background: var(--gold-accent, #C3A064);
+  color: #0A1929;
+  border-color: #FFFFFF;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.8), 0 0 30px rgba(195, 160, 100, 0.45);
+  transform: translateY(-2px);
+}
+
+.enter-platform-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.enter-platform-btn:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 4px;
+}
+
+.enter-btn-icon {
+  font-size: 15px;
+  color: var(--gold-accent, #C3A064);
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.enter-platform-btn:hover:not(:disabled) .enter-btn-icon {
+  color: #0A1929;
+  transform: translate(2px, -2px);
+}
+
+.enter-key-shortcut {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: rgba(195, 160, 100, 0.8);
+}
+
+/* ==========================================================================
+   REDUCED MOTION OVERRIDE
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .cinematic-intro-stage,
+  .cinematic-intro-stage.fade-out,
+  .intro-reveal-centerpiece .intro-emblem,
+  .intro-reveal-centerpiece .intro-wordmark,
+  .intro-reveal-centerpiece .intro-subtitle,
+  .intro-reveal-centerpiece .intro-tagline,
+  .intro-reveal-centerpiece .enter-platform-btn-container,
+  .brand-dot-gold {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .intro-reveal-centerpiece .intro-emblem,
+  .intro-reveal-centerpiece .intro-wordmark,
+  .intro-reveal-centerpiece .intro-subtitle,
+  .intro-reveal-centerpiece .intro-tagline,
+  .intro-reveal-centerpiece .enter-platform-btn-container {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+}
+
+/* ==========================================================================
+   MOBILE RESPONSIVENESS (< 640px)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .intro-skip-wrapper {
+    bottom: max(16px, env(safe-area-inset-bottom));
+    right: max(16px, env(safe-area-inset-right));
+  }
+
+  .intro-wordmark {
+    font-size: clamp(38px, 11vw, 56px);
+    letter-spacing: 0.1em;
+  }
+
+  .intro-subtitle {
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  .tagline-text {
+    font-size: 8.5px;
+    letter-spacing: 1.2px;
+  }
+
+  .enter-platform-btn {
+    padding: 13px 26px;
+    font-size: 12px;
+    width: 100%;
+    justify-content: center;
+  }
+}

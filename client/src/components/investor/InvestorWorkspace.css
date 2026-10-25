@@ -1,0 +1,837 @@
+/* ==========================================================================
+   INVESTOR WORKSPACE: INSTITUTIONAL DEAL ROOM & VENTURE FLOW STYLES
+   ========================================================================== */
+
+.investor-workspace-container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 32px 24px 64px 24px;
+  color: #1a202c;
+  box-sizing: border-box;
+}
+
+/* Header Banner */
+.investor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(7, 28, 51, 0.12);
+}
+
+.investor-crest-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #38bdf8;
+  margin-bottom: 8px;
+}
+
+.investor-crest-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.investor-title {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 2.15rem;
+  font-weight: 600;
+  color: #071C33;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.01em;
+}
+
+.investor-subtitle {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #4a5568;
+  margin: 0;
+  max-width: 720px;
+}
+
+.investor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.investor-conn-btn {
+  background: #071C33;
+  border: 1px solid #071C33;
+  color: #38bdf8;
+  padding: 11px 20px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(7, 28, 51, 0.15);
+}
+
+.investor-conn-btn:hover {
+  background: #0c2b4e;
+  color: #ffffff;
+}
+
+/* KPI Ribbon */
+.investor-kpi-ribbon {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.investor-kpi-card {
+  background: #ffffff;
+  border: 1px solid rgba(7, 28, 51, 0.1);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.investor-kpi-card:hover {
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.investor-kpi-card.selected {
+  border-color: #071C33;
+  background: #f0fdf4;
+}
+
+.investor-kpi-card .kpi-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #718096;
+  margin-bottom: 6px;
+}
+
+.investor-kpi-card .kpi-number {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #071C33;
+  margin-bottom: 4px;
+}
+
+.investor-kpi-card .kpi-number.gold {
+  color: #C3A064;
+}
+
+.investor-kpi-card .kpi-number.blue {
+  color: #0284c7;
+}
+
+.investor-kpi-card .kpi-number.teal {
+  color: #0d9488;
+}
+
+.investor-kpi-card .kpi-sub {
+  font-size: 0.78rem;
+  color: #a0aec0;
+}
+
+/* Controls Bar */
+.investor-controls-bar {
+  background: #ffffff;
+  border: 1px solid rgba(7, 28, 51, 0.1);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 28px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  font-size: 0.95rem;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 11px 40px 11px 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.filters-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.filters-group select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #334155;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filters-group select:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+
+.watchlist-filter-btn {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.watchlist-filter-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.watchlist-filter-btn.active {
+  background: #f0fdf4;
+  border-color: #16a34a;
+  color: #15803d;
+}
+
+/* Loading & Empty States */
+.investor-loading-stage,
+.investor-error-stage,
+.investor-empty-stage {
+  background: #ffffff;
+  border: 1px solid rgba(7, 28, 51, 0.1);
+  border-radius: 12px;
+  padding: 64px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.investor-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(7, 28, 51, 0.12);
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: investorSpin 0.8s linear infinite;
+}
+
+@keyframes investorSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.investor-retry-btn,
+.investor-reset-btn {
+  background: #071C33;
+  color: #ffffff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Deals Grid */
+.investor-deals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 20px;
+}
+
+.investor-deal-card {
+  background: #ffffff;
+  border: 1px solid rgba(7, 28, 51, 0.12);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.22s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.investor-deal-card:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 8px 24px rgba(7, 28, 51, 0.08);
+  transform: translateY(-2px);
+}
+
+.deal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.deal-brand-name {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #071C33;
+  margin: 0 0 2px 0;
+}
+
+.deal-legal-name {
+  font-size: 0.78rem;
+  color: #718096;
+}
+
+.deal-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deal-bookmark-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 2px;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.deal-bookmark-btn:hover {
+  color: #d97706;
+}
+
+.deal-bookmark-btn.saved {
+  color: #d97706;
+}
+
+.deal-source-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.deal-source-badge.platform {
+  background: #ecfeff;
+  color: #0e7490;
+  border: 1px solid #cffafe;
+}
+
+.deal-source-badge.show {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.deal-hook {
+  font-size: 0.88rem;
+  line-height: 1.48;
+  color: #4a5568;
+  margin: 0 0 16px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.deal-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.deal-tag {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.deal-tag.stage {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.deal-tag.model {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.deal-tag.location {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.deal-terms-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.term-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.term-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.06em;
+}
+
+.term-val {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #071C33;
+}
+
+.deal-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+  gap: 8px;
+}
+
+.deal-detail-btn {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #071C33;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deal-detail-btn:hover {
+  background: #f8fafc;
+  border-color: #071C33;
+}
+
+.deal-connect-btn {
+  background: #071C33;
+  border: 1px solid #071C33;
+  color: #F3E7CA;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deal-connect-btn:hover {
+  background: #0c2b4e;
+  color: #ffffff;
+}
+
+.deal-conn-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.deal-conn-status.connected {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.deal-conn-status.pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.deal-conn-status.tv-record {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+/* Modals */
+.investor-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background-color: rgba(4, 16, 31, 0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.investor-modal-panel,
+.connect-modal-panel {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px;
+  box-sizing: border-box;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  color: #071C33;
+}
+
+.investor-modal-header,
+.connect-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-sub-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #0284c7;
+  letter-spacing: 0.08em;
+}
+
+.investor-modal-header h2,
+.connect-modal-header h2 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.6rem;
+  color: #071C33;
+  margin: 4px 0 2px 0;
+}
+
+.modal-legal {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.investor-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.detail-section {
+  margin-bottom: 20px;
+}
+
+.detail-section h4 {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  margin: 0 0 6px 0;
+}
+
+.detail-hook-text {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #334155;
+  margin: 0;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 24px;
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.detail-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cell-lbl {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.cell-val {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #071C33;
+}
+
+.cell-val a {
+  color: #0284c7;
+  text-decoration: none;
+}
+
+.detail-founder-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.founder-avatar {
+  font-size: 1.4rem;
+}
+
+.founder-lbl {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.founder-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #071C33;
+}
+
+.investor-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 18px;
+  border-top: 1px solid #e2e8f0;
+  gap: 12px;
+}
+
+.modal-bookmark-btn {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modal-bookmark-btn.saved {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.modal-connect-btn {
+  background: #071C33;
+  color: #F3E7CA;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modal-conn-pill {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+
+.modal-conn-pill.connected {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.modal-conn-pill.pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+/* Connect Modal */
+.connect-modal-desc {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #475569;
+  margin: 0 0 20px 0;
+}
+
+.connect-error-banner {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.connect-success-banner {
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.connect-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.connect-btn-cancel {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.connect-btn-send {
+  background: #071C33;
+  color: #F3E7CA;
+  border: 1px solid #071C33;
+  padding: 9px 20px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.connect-btn-send:hover:not(:disabled) {
+  background: #0c2b4e;
+  color: #ffffff;
+}
+
+/* Responsive */
+@media (max-width: 860px) {
+  .investor-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .investor-kpi-ribbon {
+    grid-template-columns: 1fr 1fr;
+  }
+  .investor-deals-grid {
+    grid-template-columns: 1fr;
+  }
+  .filters-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filters-group select,
+  .watchlist-filter-btn {
+    width: 100%;
+  }
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .investor-kpi-ribbon {
+    grid-template-columns: 1fr;
+  }
+  .investor-modal-panel,
+  .connect-modal-panel {
+    padding: 20px 16px;
+  }
+  .investor-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
