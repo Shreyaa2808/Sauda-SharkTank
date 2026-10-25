@@ -1,0 +1,665 @@
+/* ==========================================================================
+   FOUNDER WORKSPACE: VENTURE REGISTRY & PITCH MANAGEMENT STYLES
+   ========================================================================== */
+
+.founder-workspace-container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 32px 24px 64px 24px;
+  color: #1a202c;
+  box-sizing: border-box;
+}
+
+/* Header Banner */
+.founder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(7, 28, 51, 0.12);
+}
+
+.founder-crest-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #C3A064;
+  margin-bottom: 8px;
+}
+
+.founder-crest-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #C3A064;
+  box-shadow: 0 0 6px #C3A064;
+}
+
+.founder-title {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 2.15rem;
+  font-weight: 600;
+  color: #071C33;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.01em;
+}
+
+.founder-subtitle {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #4a5568;
+  margin: 0;
+  max-width: 720px;
+}
+
+.founder-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.founder-primary-create-btn {
+  background: #071C33;
+  border: 1px solid #071C33;
+  color: #F3E7CA;
+  padding: 11px 22px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(7, 28, 51, 0.2);
+}
+
+.founder-primary-create-btn:hover {
+  background: #0c2b4e;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(7, 28, 51, 0.3);
+}
+
+.founder-secondary-action-btn {
+  background: #ffffff;
+  border: 1px solid rgba(7, 28, 51, 0.2);
+  color: #071C33;
+  padding: 11px 18px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.founder-secondary-action-btn:hover {
+  background: #f8fafc;
+  border-color: #071C33;
+}
+
+/* KPI Stats Ribbon */
+.founder-kpi-ribbon {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.founder-kpi-card {
+  background: #ffffff;
+  border: 1px solid rgba(7, 28, 51, 0.1);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.founder-kpi-card:hover {
+  border-color: #C3A064;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.founder-kpi-card.selected {
+  border-color: #071C33;
+  background: #fcfdfd;
+  box-shadow: 0 4px 12px rgba(7, 28, 51, 0.12);
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #718096;
+  margin-bottom: 6px;
+}
+
+.kpi-number {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #071C33;
+  margin-bottom: 4px;
+}
+
+.kpi-number.amber {
+  color: #d97706;
+}
+
+.kpi-number.blue {
+  color: #0284c7;
+}
+
+.kpi-number.green {
+  color: #16a34a;
+}
+
+.kpi-sub {
+  font-size: 0.78rem;
+  color: #a0aec0;
+}
+
+/* Filter Tabs */
+.founder-filter-bar {
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(7, 28, 51, 0.1);
+}
+
+.founder-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.founder-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #718096;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.founder-tab:hover {
+  color: #071C33;
+}
+
+.founder-tab.active {
+  color: #071C33;
+  border-bottom-color: #C3A064;
+}
+
+/* Loading & Empty States */
+.founder-loading-stage,
+.founder-error-stage,
+.founder-empty-stage {
+  background: #ffffff;
+  border: 1px solid rgba(7, 28, 51, 0.1);
+  border-radius: 12px;
+  padding: 64px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.founder-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(7, 28, 51, 0.12);
+  border-top-color: #C3A064;
+  border-radius: 50%;
+  animation: founderSpin 0.8s linear infinite;
+}
+
+@keyframes founderSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+}
+
+.founder-empty-stage h3 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.35rem;
+  color: #071C33;
+  margin: 0;
+}
+
+.founder-empty-stage p {
+  color: #718096;
+  font-size: 0.92rem;
+  max-width: 480px;
+  margin: 0 0 12px 0;
+}
+
+.founder-retry-btn {
+  background: #071C33;
+  color: #ffffff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Pitches Grid */
+.founder-pitches-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 20px;
+}
+
+.founder-pitch-card {
+  background: #ffffff;
+  border: 1px solid rgba(7, 28, 51, 0.12);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.22s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.founder-pitch-card:hover {
+  border-color: #C3A064;
+  box-shadow: 0 8px 24px rgba(7, 28, 51, 0.08);
+  transform: translateY(-2px);
+}
+
+.pitch-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pitch-brand-name {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #071C33;
+  margin: 0 0 2px 0;
+}
+
+.pitch-legal-name {
+  font-size: 0.78rem;
+  color: #718096;
+}
+
+.pitch-status-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.pitch-status-pill.draft {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.pitch-status-pill.submitted {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.pitch-status-pill.published {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.pitch-status-pill.rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.pitch-hook-preview {
+  font-size: 0.88rem;
+  line-height: 1.48;
+  color: #4a5568;
+  margin: 0 0 16px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pitch-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.pitch-tag {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.pitch-tag.stage {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.pitch-tag.model {
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+.pitch-tag.location {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.pitch-financials-ribbon {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.financial-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fin-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.06em;
+}
+
+.fin-val {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #071C33;
+}
+
+.pitch-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.pitch-timestamp {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.pitch-edit-btn {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #071C33;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pitch-edit-btn:hover {
+  background: #071C33;
+  color: #F3E7CA;
+  border-color: #071C33;
+}
+
+/* Pitch Form Modal */
+.pitch-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background-color: rgba(4, 16, 31, 0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.pitch-modal-panel {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px;
+  box-sizing: border-box;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  color: #071C33;
+  animation: pitchModalIn 0.22s ease-out;
+}
+
+@keyframes pitchModalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.pitch-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pitch-modal-header h2 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.55rem;
+  color: #071C33;
+  margin: 0;
+}
+
+.pitch-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.pitch-form-error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+}
+
+.pitch-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-grid-three {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  color: #0f172a;
+  background: #ffffff;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: #C3A064;
+  box-shadow: 0 0 0 3px rgba(195, 160, 100, 0.2);
+}
+
+.pitch-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.pitch-btn-cancel {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pitch-btn-draft {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pitch-btn-draft:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.pitch-btn-submit {
+  background: #071C33;
+  border: 1px solid #071C33;
+  color: #F3E7CA;
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pitch-btn-submit:hover:not(:disabled) {
+  background: #0c2b4e;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(7, 28, 51, 0.25);
+}
+
+/* Responsive */
+@media (max-width: 860px) {
+  .founder-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .founder-kpi-ribbon {
+    grid-template-columns: 1fr 1fr;
+  }
+  .founder-pitches-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid-two,
+  .form-grid-three {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .founder-kpi-ribbon {
+    grid-template-columns: 1fr;
+  }
+  .pitch-modal-panel {
+    padding: 20px 16px;
+  }
+  .pitch-modal-actions {
+    flex-direction: column;
+  }
+  .pitch-modal-actions button {
+    width: 100%;
+  }
+}

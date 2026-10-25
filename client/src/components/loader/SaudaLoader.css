@@ -1,0 +1,412 @@
+/* ==========================================================================
+   SAUDA LOADER: PREMIUM VENTURE-CAPITAL INITIALIZATION COMPONENT
+   ========================================================================== */
+
+.sauda-loader-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    ellipse at 50% 46%,
+    rgba(14, 165, 233, 0.08) 0%,
+    rgba(7, 28, 51, 0.96) 62%,
+    #051324 100%
+  );
+  color: #ffffff;
+  padding: 24px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.sauda-loader-wrapper.fullscreen-stage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100svh;
+  z-index: 99999;
+  background-color: #071C33;
+  background: radial-gradient(
+    ellipse at 50% 46%,
+    #0c2b4e 0%,
+    #071C33 55%,
+    #04101f 100%
+  );
+}
+
+.sauda-loader-wrapper.inline-stage {
+  width: 100%;
+  min-height: 280px;
+  border-radius: 12px;
+}
+
+/* Ambient Lighting Bloom */
+.loader-ambient-bloom {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(195, 160, 100, 0.08) 0%,
+    rgba(14, 165, 233, 0.06) 42%,
+    transparent 72%
+  );
+  filter: blur(28px);
+  pointer-events: none;
+}
+
+/* Orbit Area Container */
+.loader-orbit-system {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+  flex-shrink: 0;
+}
+
+/* Subtle Concentric Rings */
+.orbit-ring-track {
+  position: absolute;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 1px dashed rgba(195, 160, 100, 0.25);
+  box-shadow: inset 0 0 16px rgba(14, 165, 233, 0.08), 0 0 16px rgba(195, 160, 100, 0.06);
+}
+
+.orbit-outer-faint {
+  position: absolute;
+  width: 138px;
+  height: 138px;
+  border-radius: 50%;
+  border: 1px solid rgba(14, 165, 233, 0.12);
+}
+
+/* Concentric Expanding Water Ripples */
+.water-ripple {
+  position: absolute;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  animation: saudaRipplePulse 3.4s cubic-bezier(0.1, 0.5, 0.4, 1) infinite;
+  pointer-events: none;
+}
+
+.water-ripple.ripple-delay-1 {
+  animation-delay: 1.1s;
+}
+
+.water-ripple.ripple-delay-2 {
+  animation-delay: 2.2s;
+}
+
+@keyframes saudaRipplePulse {
+  0% {
+    transform: scale(0.25);
+    opacity: 0.8;
+  }
+  60% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+/* Center Golden Beacon */
+.center-anchor {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d8b77b;
+  box-shadow: 0 0 10px rgba(195, 160, 100, 0.85), 0 0 4px #38bdf8;
+}
+
+/* Water Droplets */
+.water-droplet {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #7dd3fc;
+  box-shadow: 0 0 6px rgba(14, 165, 233, 0.85);
+  pointer-events: none;
+  animation: saudaDropletBlink 2.8s ease-in-out infinite;
+}
+
+.droplet-1 {
+  top: 18px;
+  left: 32px;
+  animation-delay: 0.2s;
+}
+.droplet-2 {
+  top: 30px;
+  right: 22px;
+  animation-delay: 1.3s;
+}
+.droplet-3 {
+  bottom: 24px;
+  left: 26px;
+  animation-delay: 2.1s;
+}
+.droplet-4 {
+  bottom: 20px;
+  right: 34px;
+  animation-delay: 0.8s;
+}
+
+@keyframes saudaDropletBlink {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  45% {
+    opacity: 0.85;
+    transform: scale(1.2);
+  }
+  70% {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+}
+
+/* The Shark Orbiting Arm */
+.shark-orbit-arm {
+  position: absolute;
+  width: 148px;
+  height: 148px;
+  transform-origin: center center;
+  animation: saudaSharkOrbit 3.8s linear infinite;
+}
+
+@keyframes saudaSharkOrbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Shark Container located tangentially at the top apex of the orbit */
+.shark-runner {
+  position: absolute;
+  top: 22px; /* Center is 74px; radius = 74 - 22 = 52px */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 18px;
+}
+
+.shark-body-flex {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: saudaSharkFlex 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes saudaSharkFlex {
+  0% {
+    transform: rotate(-2.5deg) scaleY(0.97);
+  }
+  100% {
+    transform: rotate(2.5deg) scaleY(1.02);
+  }
+}
+
+.shark-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 2px 5px rgba(195, 160, 100, 0.45))
+    drop-shadow(0 0 10px rgba(14, 165, 233, 0.25));
+}
+
+/* Brand Wordmark & Captions */
+.loader-branding {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 5px;
+  max-width: 90vw;
+}
+
+.loader-wordmark {
+  font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #ffffff;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.loader-dot {
+  color: #c3a064;
+  margin-left: 2px;
+}
+
+.loader-subtitle {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.loader-telemetry-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.telemetry-indicator-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d8b77b;
+  box-shadow: 0 0 8px #d8b77b;
+  animation: saudaPulseDot 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes saudaPulseDot {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.loader-caption {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: #cbd5e1;
+  text-transform: uppercase;
+}
+
+/* Fine Shimmer Tracker Bar */
+.loader-shimmer-bar {
+  position: relative;
+  width: 130px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  margin-top: 14px;
+  overflow: hidden;
+}
+
+.shimmer-progress-sweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 50%;
+  background: linear-gradient(90deg, transparent, #c3a064, transparent);
+  animation: saudaShimmerSweep 1.8s ease-in-out infinite;
+}
+
+@keyframes saudaShimmerSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+/* Mobile responsive scaling */
+@media (max-width: 420px) {
+  .loader-orbit-system {
+    width: 132px;
+    height: 132px;
+    margin-bottom: 22px;
+  }
+
+  .orbit-ring-track {
+    width: 92px;
+    height: 92px;
+  }
+
+  .orbit-outer-faint {
+    width: 122px;
+    height: 122px;
+  }
+
+  .shark-orbit-arm {
+    width: 132px;
+    height: 132px;
+  }
+
+  .shark-runner {
+    top: 20px;
+    width: 38px;
+    height: 16px;
+  }
+
+  .loader-wordmark {
+    font-size: 21px;
+    letter-spacing: 0.18em;
+  }
+
+  .loader-subtitle {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+  }
+
+  .loader-caption {
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+  }
+
+  .loader-shimmer-bar {
+    width: 110px;
+  }
+}
+
+/* Reduced Motion Fallback */
+@media (prefers-reduced-motion: reduce) {
+  .shark-orbit-arm,
+  .shark-body-flex,
+  .water-ripple,
+  .water-droplet,
+  .telemetry-indicator-dot,
+  .shimmer-progress-sweep {
+    animation: none !important;
+  }
+
+  .water-ripple {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+
+  .water-droplet {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+
+  .shimmer-progress-sweep {
+    width: 100%;
+    background: #c3a064;
+    opacity: 0.6;
+  }
+}
