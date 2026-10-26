@@ -210,6 +210,29 @@ export async function fetchInvestorPitches(
   return data.data || [];
 }
 
+/**
+ * Fetch authoritative single pitch details by ID for the investor deal room.
+ */
+export async function fetchInvestorPitchDetail(
+  pitchId: number,
+  signal?: AbortSignal,
+): Promise<InvestorPitchItem> {
+  const res = await fetch(`${API_BASE_URL}/api/investor/pitches/${pitchId}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Failed to fetch pitch details: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.pitch;
+}
+
 export async function toggleInvestorWatchlist(
   pitchId: number,
 ): Promise<{ ok: true; saved: boolean } | { ok: false; error: string; message: string }> {
@@ -330,6 +353,38 @@ export async function respondToConnectionRequest(
         ok: false,
         error: data.error || 'ACTION_FAILED',
         message: data.message || 'Failed to process request action.',
+      };
+    }
+
+    return { ok: true, request: data.request };
+  } catch {
+    return {
+      ok: false,
+      error: 'NETWORK_ERROR',
+      message: 'Network error connecting to the Sauda server.',
+    };
+  }
+}
+
+export async function withdrawConnectionRequest(
+  requestId: number,
+): Promise<{ ok: true; request: ConnectionRequestItem } | { ok: false; error: string; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/connections/${requestId}/withdraw`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: data.error || 'WITHDRAW_FAILED',
+        message: data.message || 'Failed to withdraw connection request.',
       };
     }
 

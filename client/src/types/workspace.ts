@@ -94,8 +94,9 @@ export interface InvestorPitchItem {
   founderUserId: number | null;
   founderName: string | null;
   isSaved: boolean;
-  connectionStatus: 'PENDING' | 'ACCEPTED' | null;
+  connectionStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN' | 'ENDED' | null;
   connectionRequestId: number | null;
+  isConnectionInitiator?: boolean;
 }
 
 export interface InvestorPitchesFilter {

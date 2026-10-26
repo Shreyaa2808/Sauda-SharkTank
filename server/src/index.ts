@@ -23,10 +23,12 @@ import {
   updateFounderPitch,
   getInvestorDashboard,
   getInvestorPitches,
+  getInvestorPitchById,
   toggleWatchlist,
   createConnectionRequest,
   getUserConnections,
   respondToConnectionRequest,
+  withdrawConnectionRequest,
   endConnection,
   getConversationMessages,
   sendChatMessage,
@@ -559,6 +561,48 @@ app.get('/api/investor/pitches', async (req, res) => {
 });
 
 /**
+ * GET /api/investor/pitches/:pitchId
+ * Returns complete details for a single published pitch with live connection and saved status.
+ * Returns 404 if pitch does not exist or is unpublished/draft.
+ * Requires INVESTOR role.
+ */
+app.get('/api/investor/pitches/:pitchId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['INVESTOR']);
+  if (!user) return;
+
+  const pitchId = Number(req.params.pitchId);
+  if (!Number.isInteger(pitchId) || pitchId < 1) {
+    res.status(400).json({
+      error: 'INVALID_PITCH_ID',
+      message: 'Valid pitch ID required.',
+    });
+    return;
+  }
+
+  try {
+    const result = await getInvestorPitchById(user.userId, pitchId);
+    if (!result.success) {
+      res.status(result.status).json({
+        error: result.error,
+        message: result.message,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      ok: true,
+      pitch: result.pitch,
+    });
+  } catch (err) {
+    console.error('Investor pitch detail error:', err);
+    res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Failed to retrieve pitch details.',
+    });
+  }
+});
+
+/**
  * POST /api/investor/watchlist/toggle
  * Adds or removes a published pitch from investor saved list.
  * Requires INVESTOR role.
@@ -578,6 +622,14 @@ app.post('/api/investor/watchlist/toggle', async (req, res) => {
 
   try {
     const result = await toggleWatchlist(user.userId, pitchId);
+    if (!result.success) {
+      res.status(result.status).json({
+        error: result.error,
+        message: result.message,
+      });
+      return;
+    }
+
     res.status(200).json({
       ok: true,
       saved: result.saved,
@@ -703,6 +755,48 @@ app.post('/api/connections/:requestId/respond', async (req, res) => {
     res.status(500).json({
       error: 'SERVER_ERROR',
       message: 'Failed to respond to connection request.',
+    });
+  }
+});
+
+/**
+ * POST /api/connections/:requestId/withdraw
+ * Initiator/sender withdraws their pending connection request.
+ * Requires caller to be the investor initiator.
+ */
+app.post('/api/connections/:requestId/withdraw', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['INVESTOR']);
+  if (!user) return;
+
+  const requestId = Number(req.params.requestId);
+  if (!Number.isInteger(requestId) || requestId < 1) {
+    res.status(400).json({
+      error: 'INVALID_REQUEST_ID',
+      message: 'Valid request ID required.',
+    });
+    return;
+  }
+
+  try {
+    const result = await withdrawConnectionRequest(user.userId, requestId);
+    if (!result.success) {
+      res.status(result.status).json({
+        error: result.error,
+        message: result.message,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      ok: true,
+      request: result.request,
+      message: 'Connection request withdrawn successfully.',
+    });
+  } catch (err) {
+    console.error('Withdraw connection error:', err);
+    res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Failed to withdraw connection request.',
     });
   }
 });

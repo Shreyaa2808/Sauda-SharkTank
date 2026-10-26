@@ -445,13 +445,136 @@
   color: #ffffff;
 }
 
+.connections-alert-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 12px 18px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.connections-alert-banner .close-alert-btn {
+  background: transparent;
+  border: none;
+  color: #991b1b;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
 .pending-awaiting-bar {
   background: #fefce8;
   border: 1px solid #fef08a;
   color: #854d0e;
-  padding: 14px 20px;
+  padding: 16px 20px;
   border-radius: 8px;
   font-size: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.awaiting-text {
+  flex-grow: 1;
+  line-height: 1.45;
+}
+
+.btn-withdraw-req {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #b45309;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-withdraw-req:hover:not(:disabled) {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.btn-withdraw-req:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Archived / Declined / Withdrawn Request Views */
+.archived-request-view {
+  padding: 32px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.archived-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.archived-badge.declined {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.archived-badge.withdrawn {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.archived-req-header h2 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.85rem;
+  color: #071C33;
+  margin: 0 0 6px 0;
+}
+
+.declined-reason-box {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 18px 20px;
+}
+
+.declined-reason-box h4 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #991b1b;
+  margin: 0 0 8px 0;
+}
+
+.declined-reason-box p {
+  font-size: 0.95rem;
+  color: #7f1d1d;
+  margin: 0;
+}
+
+.feed-empty-icon {
+  font-size: 2.2rem;
+  margin-bottom: 8px;
+}
+
+.feed-empty h4 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.2rem;
+  color: #071C33;
+  margin: 0 0 4px 0;
 }
 
 /* Conversation Thread View */

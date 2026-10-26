@@ -576,8 +576,9 @@ export interface InvestorPitchItem {
   founderUserId: number | null;
   founderName: string | null;
   isSaved: boolean;
-  connectionStatus: 'PENDING' | 'ACCEPTED' | null;
+  connectionStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN' | 'ENDED' | null;
   connectionRequestId: number | null;
+  isConnectionInitiator?: boolean;
 }
 
 export async function getInvestorDashboard(userId: number): Promise<InvestorDashboardMetrics> {
@@ -599,17 +600,24 @@ export async function getInvestorDashboard(userId: number): Promise<InvestorDash
     [userId],
   );
 
-  // 3. Saved watchlist pitches
-  const [savedRows] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT COUNT(*) AS cnt FROM user_saved_pitch WHERE user_id = ?`,
-    [userId],
-  );
+  // 3. Saved watchlist pitches (gracefully handle if migration is pending)
+  let savedPitchesCount = 0;
+  try {
+    const [savedRows] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM user_saved_pitch WHERE user_id = ?`,
+      [userId],
+    );
+    savedPitchesCount = Number(savedRows[0]?.cnt || 0);
+  } catch (err: any) {
+    if (err.code !== 'ER_NO_SUCH_TABLE') {
+      console.warn('Watchlist query warning:', err.message);
+    }
+  }
 
   const publishedPlatformCount = Number(platformRows[0]?.cnt || 0);
   const publishedShowCount = Number(showRows[0]?.cnt || 0);
   const sentRequestsCount = Number(requestsRows[0]?.totalSent || 0);
   const activeConnectionsCount = Number(requestsRows[0]?.activeCount || 0);
-  const savedPitchesCount = Number(savedRows[0]?.cnt || 0);
 
   return {
     publishedPlatformCount,
@@ -635,7 +643,7 @@ export async function getInvestorPitches(
   filters: InvestorPitchesFilter = {},
 ): Promise<InvestorPitchItem[]> {
   const whereClauses: string[] = [`p.pitch_status = 'PUBLISHED'`];
-  const queryParams: any[] = [userId, userId];
+  const queryParams: any[] = [userId, userId, userId];
 
   if (filters.source && filters.source !== 'ALL') {
     whereClauses.push('p.pitch_type = ?');
@@ -655,9 +663,9 @@ export async function getInvestorPitches(
   if (filters.search && filters.search.trim()) {
     const term = `%${filters.search.trim().toLowerCase()}%`;
     whereClauses.push(
-      `(LOWER(c.brand_name) LIKE ? OR LOWER(COALESCE(c.legal_business_name, '')) LIKE ? OR LOWER(COALESCE(p.pitch_hook, '')) LIKE ?)`,
+      `(LOWER(c.brand_name) LIKE ? OR LOWER(COALESCE(c.legal_business_name, '')) LIKE ? OR LOWER(COALESCE(p.pitch_hook, '')) LIKE ? OR LOWER(COALESCE(c.business_model, '')) LIKE ? OR LOWER(COALESCE(i.industry_name, '')) LIKE ?)`,
     );
-    queryParams.push(term, term, term);
+    queryParams.push(term, term, term, term, term);
   }
 
   if (filters.savedOnly) {
@@ -666,11 +674,11 @@ export async function getInvestorPitches(
 
   let orderBy = 'p.submitted_at DESC, p.pitch_id DESC';
   if (filters.sortBy === 'ask_asc') {
-    orderBy = 'p.original_ask_amount ASC';
+    orderBy = 'p.original_ask_amount ASC, p.pitch_id DESC';
   } else if (filters.sortBy === 'ask_desc') {
-    orderBy = 'p.original_ask_amount DESC';
+    orderBy = 'p.original_ask_amount DESC, p.pitch_id DESC';
   } else if (filters.sortBy === 'brand_name') {
-    orderBy = 'c.brand_name ASC';
+    orderBy = 'c.brand_name ASC, p.pitch_id DESC';
   }
 
   const query = `
@@ -696,64 +704,361 @@ export async function getInvestorPitches(
       s.stage_name AS startupStage,
       CASE WHEN usp.pitch_id IS NOT NULL THEN 1 ELSE 0 END AS isSaved,
       cr.request_status AS connectionStatus,
-      cr.request_id AS connectionRequestId
+      cr.request_id AS connectionRequestId,
+      cr.investor_user_id AS connectionInvestorUserId
     FROM pitch p
     INNER JOIN company c ON c.company_id = p.company_id
     LEFT JOIN industry i ON i.industry_id = c.industry_id
     LEFT JOIN startup_stage s ON s.stage_id = c.stage_id
     LEFT JOIN app_user u ON u.user_id = p.submitted_by_user_id
     LEFT JOIN user_saved_pitch usp ON usp.pitch_id = p.pitch_id AND usp.user_id = ?
-    LEFT JOIN connection_request cr ON cr.pitch_id = p.pitch_id AND cr.investor_user_id = ? AND cr.request_status IN ('PENDING', 'ACCEPTED')
+    LEFT JOIN connection_request cr ON cr.pitch_id = p.pitch_id
+      AND (cr.investor_user_id = ? OR cr.founder_user_id = ?)
+      AND cr.request_status IN ('PENDING', 'ACCEPTED')
     WHERE ${whereClauses.join(' AND ')}
     ORDER BY ${orderBy}
   `;
 
-  const [rows] = await dbPool.execute<RowDataPacket[]>(query, queryParams);
+  try {
+    const [rows] = await dbPool.execute<RowDataPacket[]>(query, queryParams);
 
-  return rows.map((r) => ({
-    pitchId: r.pitchId,
-    companyId: r.companyId,
-    pitchType: r.pitchType,
-    brandName: r.brandName,
-    legalBusinessName: r.legalBusinessName,
-    businessModel: r.businessModel,
-    websiteUrl: r.websiteUrl,
-    foundedYear: r.foundedYear,
-    headquartersCity: r.headquartersCity,
-    headquartersState: r.headquartersState,
-    headquartersCountry: r.headquartersCountry,
-    industry: r.industry,
-    startupStage: r.startupStage,
-    originalAskAmount: r.originalAskAmount,
-    originalAskEquityPct: r.originalAskEquityPct,
-    pitchHook: r.pitchHook,
-    submittedAt: r.submittedAt,
-    founderUserId: r.founderUserId,
-    founderName: r.founderName,
-    isSaved: Boolean(r.isSaved),
-    connectionStatus: r.connectionStatus,
-    connectionRequestId: r.connectionRequestId,
-  }));
+    return rows.map((r) => ({
+      pitchId: r.pitchId,
+      companyId: r.companyId,
+      pitchType: r.pitchType,
+      brandName: r.brandName,
+      legalBusinessName: r.legalBusinessName,
+      businessModel: r.businessModel,
+      websiteUrl: r.websiteUrl,
+      foundedYear: r.foundedYear,
+      headquartersCity: r.headquartersCity,
+      headquartersState: r.headquartersState,
+      headquartersCountry: r.headquartersCountry,
+      industry: r.industry,
+      startupStage: r.startupStage,
+      originalAskAmount: r.originalAskAmount,
+      originalAskEquityPct: r.originalAskEquityPct,
+      pitchHook: r.pitchHook,
+      submittedAt: r.submittedAt,
+      founderUserId: r.founderUserId,
+      founderName: r.founderName,
+      isSaved: Boolean(r.isSaved),
+      connectionStatus: r.connectionStatus,
+      connectionRequestId: r.connectionRequestId,
+      isConnectionInitiator: r.connectionInvestorUserId === userId,
+    }));
+  } catch (err: any) {
+    if (err.code === 'ER_NO_SUCH_TABLE') {
+      // Graceful fallback if user_saved_pitch table has not been migrated yet
+      const fallbackWhere = whereClauses.filter((w) => !w.includes('usp.pitch_id'));
+      const fallbackParams: any[] = [userId, userId];
+      if (filters.source && filters.source !== 'ALL') fallbackParams.push(filters.source);
+      if (filters.industry && filters.industry !== 'ALL') fallbackParams.push(filters.industry);
+      if (filters.stage && filters.stage !== 'ALL') fallbackParams.push(filters.stage);
+      if (filters.search && filters.search.trim()) {
+        const term = `%${filters.search.trim().toLowerCase()}%`;
+        fallbackParams.push(term, term, term, term, term);
+      }
+
+      const fallbackQuery = `
+        SELECT
+          p.pitch_id AS pitchId,
+          p.company_id AS companyId,
+          p.pitch_type AS pitchType,
+          p.original_ask_amount AS originalAskAmount,
+          p.original_ask_equity_pct AS originalAskEquityPct,
+          p.pitch_hook AS pitchHook,
+          p.submitted_at AS submittedAt,
+          p.submitted_by_user_id AS founderUserId,
+          u.full_name AS founderName,
+          c.brand_name AS brandName,
+          c.legal_business_name AS legalBusinessName,
+          c.business_model AS businessModel,
+          c.website_url AS websiteUrl,
+          c.founded_year AS foundedYear,
+          c.headquarters_city AS headquartersCity,
+          c.headquarters_state AS headquartersState,
+          c.headquarters_country AS headquartersCountry,
+          i.industry_name AS industry,
+          s.stage_name AS startupStage,
+          0 AS isSaved,
+          cr.request_status AS connectionStatus,
+          cr.request_id AS connectionRequestId,
+          cr.investor_user_id AS connectionInvestorUserId
+        FROM pitch p
+        INNER JOIN company c ON c.company_id = p.company_id
+        LEFT JOIN industry i ON i.industry_id = c.industry_id
+        LEFT JOIN startup_stage s ON s.stage_id = c.stage_id
+        LEFT JOIN app_user u ON u.user_id = p.submitted_by_user_id
+        LEFT JOIN connection_request cr ON cr.pitch_id = p.pitch_id
+          AND (cr.investor_user_id = ? OR cr.founder_user_id = ?)
+          AND cr.request_status IN ('PENDING', 'ACCEPTED')
+        WHERE ${fallbackWhere.join(' AND ')}
+        ORDER BY ${orderBy}
+      `;
+
+      const [fallbackRows] = await dbPool.execute<RowDataPacket[]>(fallbackQuery, fallbackParams);
+      return fallbackRows.map((r) => ({
+        pitchId: r.pitchId,
+        companyId: r.companyId,
+        pitchType: r.pitchType,
+        brandName: r.brandName,
+        legalBusinessName: r.legalBusinessName,
+        businessModel: r.businessModel,
+        websiteUrl: r.websiteUrl,
+        foundedYear: r.foundedYear,
+        headquartersCity: r.headquartersCity,
+        headquartersState: r.headquartersState,
+        headquartersCountry: r.headquartersCountry,
+        industry: r.industry,
+        startupStage: r.startupStage,
+        originalAskAmount: r.originalAskAmount,
+        originalAskEquityPct: r.originalAskEquityPct,
+        pitchHook: r.pitchHook,
+        submittedAt: r.submittedAt,
+        founderUserId: r.founderUserId,
+        founderName: r.founderName,
+        isSaved: false,
+        connectionStatus: r.connectionStatus,
+        connectionRequestId: r.connectionRequestId,
+        isConnectionInitiator: r.connectionInvestorUserId === userId,
+      }));
+    }
+    throw err;
+  }
+}
+
+/**
+ * Authoritative single pitch detail endpoint for investor deal room.
+ * Strictly checks that pitch exists and has pitch_status = 'PUBLISHED'.
+ * Unpublished/draft founder pitches return 404.
+ */
+export async function getInvestorPitchById(
+  userId: number,
+  pitchId: number,
+): Promise<{ success: true; pitch: InvestorPitchItem } | { success: false; status: number; error: string; message: string }> {
+  const query = `
+    SELECT
+      p.pitch_id AS pitchId,
+      p.company_id AS companyId,
+      p.pitch_type AS pitchType,
+      p.pitch_status AS pitchStatus,
+      p.original_ask_amount AS originalAskAmount,
+      p.original_ask_equity_pct AS originalAskEquityPct,
+      p.pitch_hook AS pitchHook,
+      p.submitted_at AS submittedAt,
+      p.submitted_by_user_id AS founderUserId,
+      u.full_name AS founderName,
+      c.brand_name AS brandName,
+      c.legal_business_name AS legalBusinessName,
+      c.business_model AS businessModel,
+      c.website_url AS websiteUrl,
+      c.founded_year AS foundedYear,
+      c.headquarters_city AS headquartersCity,
+      c.headquarters_state AS headquartersState,
+      c.headquarters_country AS headquartersCountry,
+      i.industry_name AS industry,
+      s.stage_name AS startupStage,
+      CASE WHEN usp.pitch_id IS NOT NULL THEN 1 ELSE 0 END AS isSaved,
+      cr.request_status AS connectionStatus,
+      cr.request_id AS connectionRequestId,
+      cr.investor_user_id AS connectionInvestorUserId
+    FROM pitch p
+    INNER JOIN company c ON c.company_id = p.company_id
+    LEFT JOIN industry i ON i.industry_id = c.industry_id
+    LEFT JOIN startup_stage s ON s.stage_id = c.stage_id
+    LEFT JOIN app_user u ON u.user_id = p.submitted_by_user_id
+    LEFT JOIN user_saved_pitch usp ON usp.pitch_id = p.pitch_id AND usp.user_id = ?
+    LEFT JOIN connection_request cr ON cr.pitch_id = p.pitch_id
+      AND (cr.investor_user_id = ? OR cr.founder_user_id = ?)
+      AND cr.request_status IN ('PENDING', 'ACCEPTED')
+    WHERE p.pitch_id = ?
+  `;
+
+  try {
+    const [rows] = await dbPool.execute<RowDataPacket[]>(query, [userId, userId, userId, pitchId]);
+    if (rows.length === 0) {
+      return {
+        success: false,
+        status: 404,
+        error: 'PITCH_NOT_FOUND',
+        message: 'Pitch listing not found.',
+      };
+    }
+
+    const r = rows[0];
+    if (r.pitchStatus !== 'PUBLISHED') {
+      return {
+        success: false,
+        status: 404,
+        error: 'PITCH_NOT_PUBLISHED',
+        message: 'Pitch is not published and is not accessible to investors.',
+      };
+    }
+
+    return {
+      success: true,
+      pitch: {
+        pitchId: r.pitchId,
+        companyId: r.companyId,
+        pitchType: r.pitchType,
+        brandName: r.brandName,
+        legalBusinessName: r.legalBusinessName,
+        businessModel: r.businessModel,
+        websiteUrl: r.websiteUrl,
+        foundedYear: r.foundedYear,
+        headquartersCity: r.headquartersCity,
+        headquartersState: r.headquartersState,
+        headquartersCountry: r.headquartersCountry,
+        industry: r.industry,
+        startupStage: r.startupStage,
+        originalAskAmount: r.originalAskAmount,
+        originalAskEquityPct: r.originalAskEquityPct,
+        pitchHook: r.pitchHook,
+        submittedAt: r.submittedAt,
+        founderUserId: r.founderUserId,
+        founderName: r.founderName,
+        isSaved: Boolean(r.isSaved),
+        connectionStatus: r.connectionStatus,
+        connectionRequestId: r.connectionRequestId,
+        isConnectionInitiator: r.connectionInvestorUserId === userId,
+      },
+    };
+  } catch (err: any) {
+    if (err.code === 'ER_NO_SUCH_TABLE') {
+      const fallbackQuery = `
+        SELECT
+          p.pitch_id AS pitchId,
+          p.company_id AS companyId,
+          p.pitch_type AS pitchType,
+          p.pitch_status AS pitchStatus,
+          p.original_ask_amount AS originalAskAmount,
+          p.original_ask_equity_pct AS originalAskEquityPct,
+          p.pitch_hook AS pitchHook,
+          p.submitted_at AS submittedAt,
+          p.submitted_by_user_id AS founderUserId,
+          u.full_name AS founderName,
+          c.brand_name AS brandName,
+          c.legal_business_name AS legalBusinessName,
+          c.business_model AS businessModel,
+          c.website_url AS websiteUrl,
+          c.founded_year AS foundedYear,
+          c.headquarters_city AS headquartersCity,
+          c.headquarters_state AS headquartersState,
+          c.headquarters_country AS headquartersCountry,
+          i.industry_name AS industry,
+          s.stage_name AS startupStage,
+          0 AS isSaved,
+          cr.request_status AS connectionStatus,
+          cr.request_id AS connectionRequestId,
+          cr.investor_user_id AS connectionInvestorUserId
+        FROM pitch p
+        INNER JOIN company c ON c.company_id = p.company_id
+        LEFT JOIN industry i ON i.industry_id = c.industry_id
+        LEFT JOIN startup_stage s ON s.stage_id = c.stage_id
+        LEFT JOIN app_user u ON u.user_id = p.submitted_by_user_id
+        LEFT JOIN connection_request cr ON cr.pitch_id = p.pitch_id
+          AND (cr.investor_user_id = ? OR cr.founder_user_id = ?)
+          AND cr.request_status IN ('PENDING', 'ACCEPTED')
+        WHERE p.pitch_id = ?
+      `;
+      const [rows] = await dbPool.execute<RowDataPacket[]>(fallbackQuery, [userId, userId, pitchId]);
+      if (rows.length === 0 || rows[0].pitchStatus !== 'PUBLISHED') {
+        return {
+          success: false,
+          status: 404,
+          error: 'PITCH_NOT_FOUND',
+          message: 'Pitch listing not found or not published.',
+        };
+      }
+      const r = rows[0];
+      return {
+        success: true,
+        pitch: {
+          pitchId: r.pitchId,
+          companyId: r.companyId,
+          pitchType: r.pitchType,
+          brandName: r.brandName,
+          legalBusinessName: r.legalBusinessName,
+          businessModel: r.businessModel,
+          websiteUrl: r.websiteUrl,
+          foundedYear: r.foundedYear,
+          headquartersCity: r.headquartersCity,
+          headquartersState: r.headquartersState,
+          headquartersCountry: r.headquartersCountry,
+          industry: r.industry,
+          startupStage: r.startupStage,
+          originalAskAmount: r.originalAskAmount,
+          originalAskEquityPct: r.originalAskEquityPct,
+          pitchHook: r.pitchHook,
+          submittedAt: r.submittedAt,
+          founderUserId: r.founderUserId,
+          founderName: r.founderName,
+          isSaved: false,
+          connectionStatus: r.connectionStatus,
+          connectionRequestId: r.connectionRequestId,
+          isConnectionInitiator: r.connectionInvestorUserId === userId,
+        },
+      };
+    }
+    throw err;
+  }
 }
 
 export async function toggleWatchlist(
   userId: number,
   pitchId: number,
-): Promise<{ saved: boolean }> {
-  const [existing] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT 1 FROM user_saved_pitch WHERE user_id = ? AND pitch_id = ?`,
-    [userId, pitchId],
+): Promise<{ success: true; saved: boolean } | { success: false; status: number; error: string; message: string }> {
+  // 1. Publication security invariant: can only save published ventures
+  const [pitchRows] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT pitch_id, pitch_status FROM pitch WHERE pitch_id = ?`,
+    [pitchId],
   );
 
-  if (existing.length > 0) {
-    await dbPool.execute(`DELETE FROM user_saved_pitch WHERE user_id = ? AND pitch_id = ?`, [userId, pitchId]);
-    return { saved: false };
-  } else {
-    await dbPool.execute(
-      `INSERT INTO user_saved_pitch (user_id, pitch_id, saved_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+  if (pitchRows.length === 0) {
+    return {
+      success: false,
+      status: 404,
+      error: 'PITCH_NOT_FOUND',
+      message: 'Pitch listing not found.',
+    };
+  }
+
+  if (pitchRows[0].pitch_status !== 'PUBLISHED') {
+    return {
+      success: false,
+      status: 404,
+      error: 'PITCH_NOT_PUBLISHED',
+      message: 'Only published venture listings can be added to your watchlist.',
+    };
+  }
+
+  try {
+    const [existing] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT 1 FROM user_saved_pitch WHERE user_id = ? AND pitch_id = ?`,
       [userId, pitchId],
     );
-    return { saved: true };
+
+    if (existing.length > 0) {
+      await dbPool.execute(`DELETE FROM user_saved_pitch WHERE user_id = ? AND pitch_id = ?`, [userId, pitchId]);
+      return { success: true, saved: false };
+    } else {
+      await dbPool.execute(
+        `INSERT IGNORE INTO user_saved_pitch (user_id, pitch_id, saved_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+        [userId, pitchId],
+      );
+      return { success: true, saved: true };
+    }
+  } catch (err: any) {
+    if (err.code === 'ER_NO_SUCH_TABLE') {
+      return {
+        success: false,
+        status: 503,
+        error: 'WATCHLIST_UNAVAILABLE',
+        message: 'Watchlist table is currently initializing or unavailable. Please run migration 002_user_saved_pitch.sql.',
+      };
+    }
+    throw err;
   }
 }
 
@@ -881,12 +1186,13 @@ export async function createConnectionRequest(
       );
     }
 
-    // Check for existing active request
+    // Check for existing active request in EITHER direction
     const [existingActive] = await conn.execute<RowDataPacket[]>(
       `SELECT request_id, request_status
        FROM connection_request
-       WHERE investor_user_id = ? AND founder_user_id = ? AND request_status IN ('PENDING', 'ACCEPTED')`,
-      [investorUserId, founderUserId],
+       WHERE ((investor_user_id = ? AND founder_user_id = ?) OR (investor_user_id = ? AND founder_user_id = ?))
+         AND request_status IN ('PENDING', 'ACCEPTED')`,
+      [investorUserId, founderUserId, founderUserId, investorUserId],
     );
 
     if (existingActive.length > 0) {
@@ -928,8 +1234,16 @@ export async function createConnectionRequest(
       requestId,
       request,
     };
-  } catch (err) {
+  } catch (err: any) {
     await conn.rollback();
+    if (err.code === 'ER_DUP_ENTRY') {
+      return {
+        success: false,
+        status: 409,
+        error: 'DUPLICATE_ACTIVE_REQUEST',
+        message: 'An active connection request or active relationship already exists between you and this founder.',
+      };
+    }
     console.error('Failed to create connection request:', err);
     return {
       success: false,
@@ -940,6 +1254,59 @@ export async function createConnectionRequest(
   } finally {
     conn.release();
   }
+}
+
+/**
+ * Initiator/investor withdraws a pending connection request before response.
+ * Strictly checks that caller is the investor_user_id and status is PENDING.
+ */
+export async function withdrawConnectionRequest(
+  userId: number,
+  requestId: number,
+): Promise<{ success: true; request: ConnectionRequestItem } | { success: false; status: number; error: string; message: string }> {
+  const req = await getConnectionRequestById(requestId);
+  if (!req) {
+    return {
+      success: false,
+      status: 404,
+      error: 'REQUEST_NOT_FOUND',
+      message: 'Connection request not found.',
+    };
+  }
+
+  // Security check: ONLY the initiator/sender can withdraw
+  if (req.investorUserId !== userId) {
+    return {
+      success: false,
+      status: 403,
+      error: 'UNAUTHORIZED_INITIATOR',
+      message: 'Only the initiator of this connection request can withdraw it.',
+    };
+  }
+
+  if (req.requestStatus !== 'PENDING') {
+    return {
+      success: false,
+      status: 400,
+      error: 'INVALID_STATE',
+      message: `Cannot withdraw a request with status ${req.requestStatus}. Only PENDING requests can be withdrawn.`,
+    };
+  }
+
+  await dbPool.execute(
+    `UPDATE connection_request
+     SET request_status = 'WITHDRAWN',
+         withdrawn_at = CURRENT_TIMESTAMP,
+         status_reason = 'Withdrawn by sender'
+     WHERE request_id = ?`,
+    [requestId],
+  );
+
+  const updated = await getConnectionRequestById(requestId);
+  return {
+    success: true,
+    request: updated!,
+  };
 }
 
 export async function getConnectionRequestById(requestId: number): Promise<ConnectionRequestItem | null> {
@@ -1336,11 +1703,21 @@ export async function sendChatMessage(
     };
   }
 
+  if (trimmed.length > 5000) {
+    return {
+      success: false,
+      status: 400,
+      error: 'MESSAGE_TOO_LONG',
+      message: 'Message body cannot exceed 5,000 characters.',
+    };
+  }
+
   // Lookup conversation and verify participant authorization
   const [convRows] = await dbPool.execute<RowDataPacket[]>(
     `SELECT
        c.conversation_id AS conversationId,
        c.conversation_status AS conversationStatus,
+       cr.request_status AS requestStatus,
        cr.investor_user_id AS investorUserId,
        cr.founder_user_id AS founderUserId
      FROM conversation c
@@ -1371,8 +1748,8 @@ export async function sendChatMessage(
     };
   }
 
-  // Security check: cannot send message in ended/read-only conversation
-  if (row.conversationStatus === 'READ_ONLY') {
+  // Security check: cannot send message in ended/read-only conversation or if connection is not active
+  if (row.conversationStatus === 'READ_ONLY' || row.requestStatus !== 'ACCEPTED') {
     return {
       success: false,
       status: 403,

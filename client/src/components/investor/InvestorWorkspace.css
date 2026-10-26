@@ -507,6 +507,8 @@
   font-weight: 600;
   padding: 6px 10px;
   border-radius: 6px;
+  border: none;
+  cursor: default;
 }
 
 .deal-conn-status.connected {
@@ -519,9 +521,77 @@
   color: #b45309;
 }
 
+.deal-conn-status.ended {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.deal-conn-status.self-record {
+  background: #f8fafc;
+  color: #475569;
+  border: 1px dashed #cbd5e1;
+}
+
 .deal-conn-status.tv-record {
   color: #94a3b8;
   font-size: 0.75rem;
+}
+
+.deal-conn-btn {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.deal-conn-btn.connected {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.deal-conn-btn.connected:hover {
+  background: #bbf7d0;
+}
+
+.deal-conn-btn.respond {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.deal-conn-btn.respond:hover {
+  background: #0369a1;
+}
+
+.modal-loading-strip {
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.modal-connect-btn.connected-btn {
+  background: #15803d;
+  color: #ffffff;
+}
+
+.modal-connect-btn.pending-respond-btn {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.modal-conn-pill.ended {
+  background: #f1f5f9;
+  color: #64748b;
+  border: none;
+  cursor: pointer;
 }
 
 /* Modals */

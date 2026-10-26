@@ -6,11 +6,13 @@ import type {
 import {
   fetchConnections,
   respondToConnectionRequest,
+  withdrawConnectionRequest,
   endConnection,
   fetchConversation,
   sendChatMessage,
 } from '../../services/workspace.ts';
 import type { AuthUser } from '../../services/auth.ts';
+import { checkSession } from '../../services/auth.ts';
 import './ConnectionsHub.css';
 
 export interface ConnectionsHubProps {
@@ -18,16 +20,21 @@ export interface ConnectionsHubProps {
   onNavigateToDiscovery?: () => void;
 }
 
-export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onNavigateToDiscovery }) => {
+export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({
+  currentUser: initialUser,
+  onNavigateToDiscovery,
+}) => {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialUser);
   const [incoming, setIncoming] = useState<ConnectionRequestItem[]>([]);
   const [sent, setSent] = useState<ConnectionRequestItem[]>([]);
   const [active, setActive] = useState<ConnectionRequestItem[]>([]);
   const [ended, setEnded] = useState<ConnectionRequestItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // Tab: 'active' | 'incoming' | 'sent' | 'ended'
-  const [currentTab, setCurrentTab] = useState<'active' | 'incoming' | 'sent' | 'ended'>('active');
+  // Tab: 'incoming' | 'sent' | 'active' | 'ended'
+  const [currentTab, setCurrentTab] = useState<'incoming' | 'sent' | 'active' | 'ended'>('active');
 
   // Selected Connection or Conversation
   const [selectedRequest, setSelectedRequest] = useState<ConnectionRequestItem | null>(null);
@@ -35,7 +42,9 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
   const [convLoading, setConvLoading] = useState<boolean>(false);
   const [convError, setConvError] = useState<string | null>(null);
 
-  // Message Sending
+  // In-flight action states
+  const [respondSubmitting, setRespondSubmitting] = useState<boolean>(false);
+  const [withdrawSubmitting, setWithdrawSubmitting] = useState<boolean>(false);
   const [messageInput, setMessageInput] = useState<string>('');
   const [sendSubmitting, setSendSubmitting] = useState<boolean>(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -47,7 +56,22 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
   // Ref to chat feed for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const loadConnections = useCallback(async (selectFirstActive: boolean = false) => {
+  // Ensure current user is resolved if not passed down directly
+  useEffect(() => {
+    if (!currentUser) {
+      let isMounted = true;
+      void checkSession().then((session) => {
+        if (isMounted && session.user) {
+          setCurrentUser(session.user);
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [currentUser]);
+
+  const loadConnections = useCallback(async (selectFirstItem: boolean = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -57,14 +81,19 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
       setActive(data.active);
       setEnded(data.ended);
 
-      // Auto-select first active or incoming item if none selected
-      if (selectFirstActive) {
+      if (selectFirstItem) {
         if (data.active.length > 0) {
           setCurrentTab('active');
           setSelectedRequest(data.active[0]);
         } else if (data.incoming.length > 0) {
           setCurrentTab('incoming');
           setSelectedRequest(data.incoming[0]);
+        } else if (data.sent.length > 0) {
+          setCurrentTab('sent');
+          setSelectedRequest(data.sent[0]);
+        } else if (data.ended.length > 0) {
+          setCurrentTab('ended');
+          setSelectedRequest(data.ended[0]);
         }
       }
     } catch (err: any) {
@@ -92,6 +121,12 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
           } else if (data.incoming.length > 0) {
             setCurrentTab('incoming');
             setSelectedRequest(data.incoming[0]);
+          } else if (data.sent.length > 0) {
+            setCurrentTab('sent');
+            setSelectedRequest(data.sent[0]);
+          } else if (data.ended.length > 0) {
+            setCurrentTab('ended');
+            setSelectedRequest(data.ended[0]);
           }
         }
       } catch (err: any) {
@@ -112,7 +147,6 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
     };
   }, []);
 
-  // Load conversation when selectedRequest has a conversationId
   const loadConversationData = useCallback(async (conversationId: number) => {
     setConvLoading(true);
     setConvError(null);
@@ -132,33 +166,12 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
       return;
     }
 
-    const targetId: number = conversationId;
-    let ignore = false;
+    const timer = setTimeout(() => {
+      void loadConversationData(conversationId);
+    }, 0);
 
-    async function fetchThread(id: number) {
-      try {
-        const convData = await fetchConversation(id);
-        if (!ignore) {
-          setConversation(convData);
-          setConvError(null);
-        }
-      } catch (err: any) {
-        if (!ignore) {
-          setConvError(err.message || 'Failed to load conversation thread.');
-        }
-      } finally {
-        if (!ignore) {
-          setConvLoading(false);
-        }
-      }
-    }
-
-    void fetchThread(targetId);
-
-    return () => {
-      ignore = true;
-    };
-  }, [selectedRequest?.conversationId]);
+    return () => clearTimeout(timer);
+  }, [selectedRequest?.conversationId, loadConversationData]);
 
   // Auto-scroll chat feed to bottom on new messages
   useEffect(() => {
@@ -168,36 +181,57 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
   const handleSelectRequest = (req: ConnectionRequestItem) => {
     setSelectedRequest(req);
     setSendError(null);
+    setActionError(null);
     if (!req.conversationId) {
       setConversation(null);
     }
   };
 
   const handleRespond = async (action: 'ACCEPT' | 'DECLINE') => {
-    if (!selectedRequest) return;
+    if (!selectedRequest || respondSubmitting) return;
+
+    setRespondSubmitting(true);
+    setActionError(null);
     const res = await respondToConnectionRequest(selectedRequest.requestId, action);
+    setRespondSubmitting(false);
+
     if (res.ok) {
       await loadConnections(false);
+      setSelectedRequest(res.request);
       if (action === 'ACCEPT') {
-        setSelectedRequest(res.request);
         setCurrentTab('active');
-      } else {
-        setSelectedRequest(null);
-        setConversation(null);
       }
     } else {
-      alert(`Error: ${res.message}`);
+      setActionError(res.message);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!selectedRequest || withdrawSubmitting) return;
+
+    setWithdrawSubmitting(true);
+    setActionError(null);
+    const res = await withdrawConnectionRequest(selectedRequest.requestId);
+    setWithdrawSubmitting(false);
+
+    if (res.ok) {
+      await loadConnections(false);
+      setSelectedRequest(res.request);
+      setCurrentTab('ended');
+    } else {
+      setActionError(res.message);
     }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!conversation || !messageInput.trim()) return;
+    const trimmed = messageInput.trim();
+    if (!conversation || !trimmed || sendSubmitting) return;
 
     setSendSubmitting(true);
     setSendError(null);
 
-    const res = await sendChatMessage(conversation.conversationId, messageInput.trim());
+    const res = await sendChatMessage(conversation.conversationId, trimmed);
     setSendSubmitting(false);
 
     if (res.ok) {
@@ -216,32 +250,34 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
   };
 
   const handleEndConnection = async () => {
-    if (!selectedRequest) return;
+    if (!selectedRequest || endSubmitting) return;
 
     setEndSubmitting(true);
+    setActionError(null);
     const res = await endConnection(selectedRequest.requestId);
     setEndSubmitting(false);
     setIsEndModalOpen(false);
 
     if (res.ok) {
       setSelectedRequest(res.request);
-      if (selectedRequest.conversationId) {
-        await loadConversationData(selectedRequest.conversationId);
+      if (res.request.conversationId) {
+        await loadConversationData(res.request.conversationId);
       }
       await loadConnections(false);
+      setCurrentTab('ended');
     } else {
-      alert(`Failed to end connection: ${res.message}`);
+      setActionError(`Failed to end connection: ${res.message}`);
     }
   };
 
   const getListForCurrentTab = (): ConnectionRequestItem[] => {
     switch (currentTab) {
-      case 'active':
-        return active;
       case 'incoming':
         return incoming;
       case 'sent':
         return sent;
+      case 'active':
+        return active;
       case 'ended':
         return ended;
     }
@@ -286,19 +322,21 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
         </button>
       </div>
 
+      {actionError && (
+        <div className="connections-alert-banner" role="alert">
+          ⚠️ {actionError}
+          <button type="button" className="close-alert-btn" onClick={() => setActionError(null)}>
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Two Pane Layout */}
       <div className="connections-stage-grid">
         {/* Left Pane: Requests & Connections List */}
         <div className="connections-sidebar">
           {/* Tabs */}
           <div className="conn-tabs-nav">
-            <button
-              type="button"
-              className={`conn-tab ${currentTab === 'active' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('active')}
-            >
-              Active ({active.length})
-            </button>
             <button
               type="button"
               className={`conn-tab ${currentTab === 'incoming' ? 'active' : ''}`}
@@ -315,10 +353,17 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
             </button>
             <button
               type="button"
+              className={`conn-tab ${currentTab === 'active' ? 'active' : ''}`}
+              onClick={() => setCurrentTab('active')}
+            >
+              Accepted ({active.length})
+            </button>
+            <button
+              type="button"
               className={`conn-tab ${currentTab === 'ended' ? 'active' : ''}`}
               onClick={() => setCurrentTab('ended')}
             >
-              Archived ({ended.length})
+              Ended ({ended.length})
             </button>
           </div>
 
@@ -336,11 +381,33 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
               </div>
             ) : currentList.length === 0 ? (
               <div className="conn-side-empty">
-                <p>No {currentTab} connections found.</p>
-                {currentTab === 'sent' && onNavigateToDiscovery && (
-                  <button type="button" className="conn-discover-btn" onClick={onNavigateToDiscovery}>
-                    Explore Deals to Connect →
-                  </button>
+                {currentTab === 'incoming' && (
+                  <>
+                    <p>No incoming connection requests.</p>
+                    <span className="empty-sub">When investors propose connections for your ventures, they will appear here.</span>
+                  </>
+                )}
+                {currentTab === 'sent' && (
+                  <>
+                    <p>No pending sent requests.</p>
+                    {onNavigateToDiscovery && (
+                      <button type="button" className="conn-discover-btn" onClick={onNavigateToDiscovery}>
+                        Explore Deals to Connect →
+                      </button>
+                    )}
+                  </>
+                )}
+                {currentTab === 'active' && (
+                  <>
+                    <p>No active connections yet.</p>
+                    <span className="empty-sub">Accepted proposals will appear here with private message threads.</span>
+                  </>
+                )}
+                {currentTab === 'ended' && (
+                  <>
+                    <p>No ended or archived connections.</p>
+                    <span className="empty-sub">Completed or declined relationships will be retained here for historical review.</span>
+                  </>
                 )}
               </div>
             ) : (
@@ -430,21 +497,101 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                   <button
                     type="button"
                     className="btn-decline-req"
+                    disabled={respondSubmitting}
                     onClick={() => handleRespond('DECLINE')}
                   >
-                    Decline Request
+                    {respondSubmitting ? 'Processing...' : 'Decline Request'}
                   </button>
                   <button
                     type="button"
                     className="btn-accept-req"
+                    disabled={respondSubmitting}
                     onClick={() => handleRespond('ACCEPT')}
                   >
-                    Accept Connection & Open Chat →
+                    {respondSubmitting ? 'Accepting...' : 'Accept Connection & Open Chat →'}
                   </button>
                 </div>
               ) : (
                 <div className="pending-awaiting-bar">
-                  ⏳ Awaiting response from {selectedRequest.founderName}. You will be notified once the founder accepts.
+                  <div className="awaiting-text">
+                    ⏳ <strong>Awaiting Response:</strong> Your proposal was delivered to {selectedRequest.founderName}. You will be notified once the founder accepts or declines.
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-withdraw-req"
+                    disabled={withdrawSubmitting}
+                    onClick={handleWithdraw}
+                    title="Withdraw this pending request"
+                  >
+                    {withdrawSubmitting ? 'Withdrawing...' : 'Withdraw Request'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : selectedRequest.requestStatus === 'DECLINED' && !selectedRequest.conversationId ? (
+            /* DECLINED REQUEST VIEW (No Conversation) */
+            <div className="archived-request-view">
+              <div className="archived-req-header declined">
+                <span className="archived-badge declined">REQUEST DECLINED</span>
+                <h2>{selectedRequest.brandName}</h2>
+                <p className="req-sub">
+                  Responded on {selectedRequest.respondedAt ? new Date(selectedRequest.respondedAt).toLocaleDateString() : '—'}
+                </p>
+              </div>
+
+              <div className="parties-card">
+                <div className="party-block">
+                  <span className="party-role">Investor Requester</span>
+                  <span className="party-name">{selectedRequest.investorName}</span>
+                </div>
+                <div className="party-arrow">→</div>
+                <div className="party-block">
+                  <span className="party-role">Founder Recipient</span>
+                  <span className="party-name">{selectedRequest.founderName}</span>
+                </div>
+              </div>
+
+              {selectedRequest.initialMessage && (
+                <div className="initial-message-box">
+                  <h4>Original Proposal</h4>
+                  <p>{selectedRequest.initialMessage}</p>
+                </div>
+              )}
+
+              {selectedRequest.statusReason && (
+                <div className="declined-reason-box">
+                  <h4>Reason Provided</h4>
+                  <p>{selectedRequest.statusReason}</p>
+                </div>
+              )}
+            </div>
+          ) : selectedRequest.requestStatus === 'WITHDRAWN' && !selectedRequest.conversationId ? (
+            /* WITHDRAWN REQUEST VIEW (No Conversation) */
+            <div className="archived-request-view">
+              <div className="archived-req-header withdrawn">
+                <span className="archived-badge withdrawn">REQUEST WITHDRAWN</span>
+                <h2>{selectedRequest.brandName}</h2>
+                <p className="req-sub">
+                  Withdrawn on {selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleDateString() : '—'}
+                </p>
+              </div>
+
+              <div className="parties-card">
+                <div className="party-block">
+                  <span className="party-role">Investor Requester</span>
+                  <span className="party-name">{selectedRequest.investorName}</span>
+                </div>
+                <div className="party-arrow">→</div>
+                <div className="party-block">
+                  <span className="party-role">Founder Recipient</span>
+                  <span className="party-name">{selectedRequest.founderName}</span>
+                </div>
+              </div>
+
+              {selectedRequest.initialMessage && (
+                <div className="initial-message-box">
+                  <h4>Original Proposal</h4>
+                  <p>{selectedRequest.initialMessage}</p>
                 </div>
               )}
             </div>
@@ -486,9 +633,9 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
               </div>
 
               {/* Closed Connection Banner */}
-              {conversation?.conversationStatus === 'READ_ONLY' && (
+              {(conversation?.conversationStatus === 'READ_ONLY' || selectedRequest.requestStatus === 'ENDED') && (
                 <div className="read-only-banner" role="status">
-                  🔒 This connection has ended. Message history is preserved in read-only mode.
+                  🔒 This connection has ended. Conversation history is read-only.
                 </div>
               )}
 
@@ -503,7 +650,9 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                   <div className="feed-error">⚠️ {convError}</div>
                 ) : conversation?.messages.length === 0 ? (
                   <div className="feed-empty">
-                    <p>No messages yet. Send a greeting to initiate discussion.</p>
+                    <div className="feed-empty-icon">🤝</div>
+                    <h4>Connection accepted!</h4>
+                    <p>Send the first message to start the conversation.</p>
                   </div>
                 ) : (
                   conversation?.messages.map((msg) => {
@@ -531,7 +680,7 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
               </div>
 
               {/* Message Input Box */}
-              {conversation?.conversationStatus === 'OPEN' ? (
+              {conversation?.conversationStatus === 'OPEN' && selectedRequest.requestStatus === 'ACCEPTED' ? (
                 <form onSubmit={handleSendMessage} className="conv-input-form">
                   {sendError && <div className="send-err-msg">⚠️ {sendError}</div>}
                   <div className="input-group">
@@ -541,7 +690,7 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
                       disabled={sendSubmitting}
-                      maxLength={2000}
+                      maxLength={5000}
                     />
                     <button
                       type="submit"
@@ -554,7 +703,7 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                 </form>
               ) : (
                 <div className="conv-input-disabled">
-                  Messaging is closed for this connection.
+                  🔒 This connection has ended. Conversation history is read-only.
                 </div>
               )}
             </div>

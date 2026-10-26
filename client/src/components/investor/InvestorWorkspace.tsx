@@ -7,10 +7,12 @@ import type {
 import {
   fetchInvestorDashboard,
   fetchInvestorPitches,
+  fetchInvestorPitchDetail,
   toggleInvestorWatchlist,
   sendConnectionRequest,
   fetchCategories,
 } from '../../services/workspace.ts';
+import { checkSession } from '../../services/auth.ts';
 import { formatCurrencyINR } from '../../utils/formatters.ts';
 import './InvestorWorkspace.css';
 
@@ -29,6 +31,9 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Current authenticated user (for self-connection guard in UI)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
   // Filters & Sorting
   const [search, setSearch] = useState<string>('');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('ALL');
@@ -37,8 +42,12 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
   const [sortBy, setSortBy] = useState<'latest' | 'ask_asc' | 'ask_desc' | 'brand_name'>('latest');
   const [savedOnly, setSavedOnly] = useState<boolean>(false);
 
-  // Detail Modal
+  // In-flight guard for watchlist toggle per pitch ID
+  const [watchlistInProgress, setWatchlistInProgress] = useState<Record<number, boolean>>({});
+
+  // Pitch Detail Modal
   const [detailPitch, setDetailPitch] = useState<InvestorPitchItem | null>(null);
+  const [detailLoading, setDetailLoading] = useState<boolean>(false);
 
   // Connect Request Modal
   const [connectPitch, setConnectPitch] = useState<InvestorPitchItem | null>(null);
@@ -46,6 +55,19 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
   const [connectSubmitting, setConnectSubmitting] = useState<boolean>(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [connectSuccess, setConnectSuccess] = useState<string | null>(null);
+
+  // Resolve authenticated user ID on mount
+  useEffect(() => {
+    let isMounted = true;
+    void checkSession().then((session) => {
+      if (isMounted && session.user) {
+        setCurrentUserId(session.user.userId);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -81,17 +103,42 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
   }, [loadData]);
 
   const handleToggleWatchlist = async (pitch: InvestorPitchItem) => {
-    const res = await toggleInvestorWatchlist(pitch.pitchId);
-    if (res.ok) {
-      setPitches((prev) =>
-        prev.map((p) => (p.pitchId === pitch.pitchId ? { ...p, isSaved: res.saved } : p)),
-      );
-      if (metrics) {
-        setMetrics({
-          ...metrics,
-          savedPitchesCount: res.saved ? metrics.savedPitchesCount + 1 : Math.max(0, metrics.savedPitchesCount - 1),
-        });
+    if (watchlistInProgress[pitch.pitchId]) return;
+
+    setWatchlistInProgress((prev) => ({ ...prev, [pitch.pitchId]: true }));
+    try {
+      const res = await toggleInvestorWatchlist(pitch.pitchId);
+      if (res.ok) {
+        setPitches((prev) =>
+          prev.map((p) => (p.pitchId === pitch.pitchId ? { ...p, isSaved: res.saved } : p)),
+        );
+        if (detailPitch && detailPitch.pitchId === pitch.pitchId) {
+          setDetailPitch((prev) => (prev ? { ...prev, isSaved: res.saved } : null));
+        }
+        if (metrics) {
+          setMetrics({
+            ...metrics,
+            savedPitchesCount: res.saved ? metrics.savedPitchesCount + 1 : Math.max(0, metrics.savedPitchesCount - 1),
+          });
+        }
+      } else {
+        alert(`Watchlist: ${res.message}`);
       }
+    } finally {
+      setWatchlistInProgress((prev) => ({ ...prev, [pitch.pitchId]: false }));
+    }
+  };
+
+  const handleOpenDetail = async (pitch: InvestorPitchItem) => {
+    setDetailPitch(pitch);
+    setDetailLoading(true);
+    try {
+      const freshPitch = await fetchInvestorPitchDetail(pitch.pitchId);
+      setDetailPitch(freshPitch);
+    } catch {
+      // Retain already-loaded card data if detail refresh fails
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -108,10 +155,16 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
     e.preventDefault();
     if (!connectPitch) return;
 
+    const trimmedMsg = initialMessage.trim();
+    if (!trimmedMsg) {
+      setConnectError('Introduction message is required.');
+      return;
+    }
+
     setConnectSubmitting(true);
     setConnectError(null);
 
-    const res = await sendConnectionRequest(connectPitch.pitchId, initialMessage);
+    const res = await sendConnectionRequest(connectPitch.pitchId, trimmedMsg);
     setConnectSubmitting(false);
 
     if (res.ok) {
@@ -120,10 +173,27 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
       setPitches((prev) =>
         prev.map((p) =>
           p.pitchId === connectPitch.pitchId
-            ? { ...p, connectionStatus: 'PENDING', connectionRequestId: res.request.requestId }
+            ? {
+                ...p,
+                connectionStatus: 'PENDING',
+                connectionRequestId: res.request.requestId,
+                isConnectionInitiator: true,
+              }
             : p,
         ),
       );
+      if (detailPitch && detailPitch.pitchId === connectPitch.pitchId) {
+        setDetailPitch((prev) =>
+          prev
+            ? {
+                ...prev,
+                connectionStatus: 'PENDING',
+                connectionRequestId: res.request.requestId,
+                isConnectionInitiator: true,
+              }
+            : null,
+        );
+      }
       if (metrics) {
         setMetrics({
           ...metrics,
@@ -136,6 +206,124 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
     } else {
       setConnectError(res.message);
     }
+  };
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setSelectedIndustry('ALL');
+    setSelectedStage('ALL');
+    setSelectedSource('ALL');
+    setSortBy('latest');
+    setSavedOnly(false);
+  };
+
+  /**
+   * Helper to render live contextual relationship actions based on MySQL state
+   */
+  const renderConnectionAction = (pitch: InvestorPitchItem, isDetailModal: boolean = false) => {
+    // 1. SHOW historical records have no real connectable platform founder
+    if (pitch.pitchType === 'SHOW') {
+      return (
+        <span
+          className="deal-conn-status tv-record"
+          title="Historical Shark Tank India television broadcast record. Intro requests are available for platform listings."
+        >
+          TV Broadcast Record
+        </span>
+      );
+    }
+
+    // 2. Self-connection prevention in UI
+    if (currentUserId && pitch.founderUserId === currentUserId) {
+      return (
+        <span
+          className="deal-conn-status self-record"
+          title="You submitted this platform venture listing."
+        >
+          Your Own Listing
+        </span>
+      );
+    }
+
+    // 3. Accepted active connection
+    if (pitch.connectionStatus === 'ACCEPTED') {
+      return (
+        <button
+          type="button"
+          className={isDetailModal ? 'modal-connect-btn connected-btn' : 'deal-conn-btn connected'}
+          onClick={() => {
+            if (isDetailModal) setDetailPitch(null);
+            onNavigateToConnections?.();
+          }}
+          title="Active connection accepted. Click to open message thread in Connections Hub."
+        >
+          ✓ Connected — Open Messages →
+        </button>
+      );
+    }
+
+    // 4. Pending request
+    if (pitch.connectionStatus === 'PENDING') {
+      if (pitch.isConnectionInitiator === false) {
+        return (
+          <button
+            type="button"
+            className={isDetailModal ? 'modal-connect-btn pending-respond-btn' : 'deal-conn-btn respond'}
+            onClick={() => {
+              if (isDetailModal) setDetailPitch(null);
+              onNavigateToConnections?.();
+            }}
+            title="Connection request received from founder. Click to respond in Connections Hub."
+          >
+            Respond to Request →
+          </button>
+        );
+      }
+      return (
+        <button
+          type="button"
+          className={isDetailModal ? 'modal-conn-pill pending' : 'deal-conn-status pending'}
+          onClick={() => {
+            if (isDetailModal) setDetailPitch(null);
+            onNavigateToConnections?.();
+          }}
+          title="Your connection request is pending founder acceptance. Click to view in Connections."
+        >
+          ⏳ Request Pending
+        </button>
+      );
+    }
+
+    // 5. Ended connection
+    if (pitch.connectionStatus === 'ENDED') {
+      return (
+        <button
+          type="button"
+          className={isDetailModal ? 'modal-conn-pill ended' : 'deal-conn-status ended'}
+          onClick={() => {
+            if (isDetailModal) setDetailPitch(null);
+            onNavigateToConnections?.();
+          }}
+          title="This connection has ended. Click to view historical conversation in Connections."
+        >
+          Connection Ended (View History →)
+        </button>
+      );
+    }
+
+    // 6. No active connection -> request intro
+    return (
+      <button
+        type="button"
+        className={isDetailModal ? 'modal-connect-btn' : 'deal-connect-btn'}
+        onClick={() => {
+          if (isDetailModal) setDetailPitch(null);
+          handleOpenConnect(pitch);
+        }}
+      >
+        Request Introduction →
+      </button>
+    );
   };
 
   return (
@@ -176,22 +364,43 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
 
       {/* KPI Stats Ribbon */}
       <div className="investor-kpi-ribbon">
-        <div className="investor-kpi-card" onClick={() => { setSelectedSource('ALL'); setSavedOnly(false); }}>
+        <div
+          className={`investor-kpi-card ${selectedSource === 'ALL' && !savedOnly ? 'selected' : ''}`}
+          onClick={() => {
+            setSelectedSource('ALL');
+            setSavedOnly(false);
+          }}
+        >
           <span className="kpi-label">Total Published Deals</span>
           <span className="kpi-number">{metrics ? metrics.totalPublishedCount : '—'}</span>
           <span className="kpi-sub">Dual-source deal registry</span>
         </div>
-        <div className={`investor-kpi-card ${selectedSource === 'PLATFORM' && !savedOnly ? 'selected' : ''}`} onClick={() => { setSelectedSource('PLATFORM'); setSavedOnly(false); }}>
+        <div
+          className={`investor-kpi-card ${selectedSource === 'PLATFORM' && !savedOnly ? 'selected' : ''}`}
+          onClick={() => {
+            setSelectedSource('PLATFORM');
+            setSavedOnly(false);
+          }}
+        >
           <span className="kpi-label">Platform Direct Listings</span>
           <span className="kpi-number gold">{metrics ? metrics.publishedPlatformCount : '—'}</span>
           <span className="kpi-sub">Direct founder connect eligible</span>
         </div>
-        <div className={`investor-kpi-card ${selectedSource === 'SHOW' && !savedOnly ? 'selected' : ''}`} onClick={() => { setSelectedSource('SHOW'); setSavedOnly(false); }}>
+        <div
+          className={`investor-kpi-card ${selectedSource === 'SHOW' && !savedOnly ? 'selected' : ''}`}
+          onClick={() => {
+            setSelectedSource('SHOW');
+            setSavedOnly(false);
+          }}
+        >
           <span className="kpi-label">Television Pitches</span>
           <span className="kpi-number blue">{metrics ? metrics.publishedShowCount : '—'}</span>
           <span className="kpi-sub">Broadcasted show history</span>
         </div>
-        <div className={`investor-kpi-card ${savedOnly ? 'selected' : ''}`} onClick={() => setSavedOnly(!savedOnly)}>
+        <div
+          className={`investor-kpi-card ${savedOnly ? 'selected' : ''}`}
+          onClick={() => setSavedOnly(!savedOnly)}
+        >
           <span className="kpi-label">Saved to Watchlist</span>
           <span className="kpi-number teal">{metrics ? metrics.savedPitchesCount : '—'}</span>
           <span className="kpi-sub">Bookmarked ventures</span>
@@ -204,7 +413,7 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
           <span className="search-icon">🔍</span>
           <input
             type="text"
-            placeholder="Search by venture name, business model, or thesis keywords..."
+            placeholder="Search by venture name, thesis, business model, or industry..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -272,21 +481,15 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
         </div>
       ) : pitches.length === 0 ? (
         <div className="investor-empty-stage">
-          <div className="empty-icon">📊</div>
-          <h3>No ventures match your criteria.</h3>
-          <p>Try resetting filters or expanding your search terms.</p>
-          <button
-            type="button"
-            className="investor-reset-btn"
-            onClick={() => {
-              setSearch('');
-              setSelectedIndustry('ALL');
-              setSelectedStage('ALL');
-              setSelectedSource('ALL');
-              setSavedOnly(false);
-            }}
-          >
-            Reset All Filters
+          <div className="empty-icon">{savedOnly ? '⭐' : '📊'}</div>
+          <h3>{savedOnly ? 'Your Watchlist is empty.' : 'No ventures match your criteria.'}</h3>
+          <p>
+            {savedOnly
+              ? 'Click the star icon on any venture card to bookmark it for quick access and tracking.'
+              : 'Try adjusting your search terms or clearing one or more active filters.'}
+          </p>
+          <button type="button" className="investor-reset-btn" onClick={handleResetFilters}>
+            {savedOnly ? 'Browse All Ventures' : 'Reset All Filters'}
           </button>
         </div>
       ) : (
@@ -304,6 +507,7 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
                   <button
                     type="button"
                     className={`deal-bookmark-btn ${pitch.isSaved ? 'saved' : ''}`}
+                    disabled={watchlistInProgress[pitch.pitchId]}
                     onClick={() => handleToggleWatchlist(pitch)}
                     title={pitch.isSaved ? 'Remove from watchlist' : 'Save to watchlist'}
                     aria-label={pitch.isSaved ? 'Remove from watchlist' : 'Save to watchlist'}
@@ -349,28 +553,12 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
                 <button
                   type="button"
                   className="deal-detail-btn"
-                  onClick={() => setDetailPitch(pitch)}
+                  onClick={() => handleOpenDetail(pitch)}
                 >
                   View Details
                 </button>
 
-                {pitch.pitchType === 'PLATFORM' ? (
-                  pitch.connectionStatus === 'ACCEPTED' ? (
-                    <span className="deal-conn-status connected">✓ Connected</span>
-                  ) : pitch.connectionStatus === 'PENDING' ? (
-                    <span className="deal-conn-status pending">⏳ Request Pending</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="deal-connect-btn"
-                      onClick={() => handleOpenConnect(pitch)}
-                    >
-                      Request Intro →
-                    </button>
-                  )
-                ) : (
-                  <span className="deal-conn-status tv-record">TV Broadcast Record</span>
-                )}
+                {renderConnectionAction(pitch, false)}
               </div>
             </div>
           ))}
@@ -395,6 +583,10 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
             </div>
 
             <div className="investor-modal-body">
+              {detailLoading && (
+                <div className="modal-loading-strip">Refreshing venture status...</div>
+              )}
+
               {detailPitch.pitchHook && (
                 <div className="detail-section">
                   <h4>Venture Thesis / Summary</h4>
@@ -468,29 +660,13 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
               <button
                 type="button"
                 className={`modal-bookmark-btn ${detailPitch.isSaved ? 'saved' : ''}`}
+                disabled={watchlistInProgress[detailPitch.pitchId]}
                 onClick={() => handleToggleWatchlist(detailPitch)}
               >
                 {detailPitch.isSaved ? '★ Bookmarked in Watchlist' : '☆ Add to Watchlist'}
               </button>
 
-              {detailPitch.pitchType === 'PLATFORM' && (
-                detailPitch.connectionStatus === 'ACCEPTED' ? (
-                  <span className="modal-conn-pill connected">✓ Active Connection</span>
-                ) : detailPitch.connectionStatus === 'PENDING' ? (
-                  <span className="modal-conn-pill pending">⏳ Request Pending</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="modal-connect-btn"
-                    onClick={() => {
-                      setDetailPitch(null);
-                      handleOpenConnect(detailPitch);
-                    }}
-                  >
-                    Request Introduction →
-                  </button>
-                )
-              )}
+              {renderConnectionAction(detailPitch, true)}
             </div>
           </div>
         </div>

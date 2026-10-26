@@ -216,16 +216,38 @@ async function runTests() {
   const leakCheck = invPitchesJson.data.some((p: any) => p.pitchId === testPitchId);
   assert(!leakCheck, 'Unpublished SUBMITTED draft pitch is NOT exposed in investor deal room');
 
+  // Direct request for unpublished pitch ID must return 404 (Private pitch protection)
+  const directUnpubRes = await fetch(`${API_BASE}/investor/pitches/${testPitchId}`, {
+    headers: { Cookie: investorCookie },
+  });
+  assert(directUnpubRes.status === 404, 'Direct request for unpublished pitch ID returns 404 Not Found');
+
+  // Attempting to save an unpublished pitch to watchlist must return 404
+  const watchUnpubRes = await fetch(`${API_BASE}/investor/watchlist/toggle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: investorCookie },
+    body: JSON.stringify({ pitchId: testPitchId }),
+  });
+  assert(watchUnpubRes.status === 404, 'Saving unpublished pitch to watchlist returns 404 Not Found');
+
   // Mark test pitch as PUBLISHED in test DB so connection request can be tested
   await dbPool.execute(`UPDATE pitch SET pitch_status = 'PUBLISHED' WHERE pitch_id = ?`, [testPitchId]);
 
-  // Now verify it is visible
+  // Now verify it is visible in list
   const invPitchesAfterPublish = await fetch(`${API_BASE}/investor/pitches`, {
     headers: { Cookie: investorCookie },
   });
   const invPitchesAfterJson = await invPitchesAfterPublish.json();
   const publishedVisible = invPitchesAfterJson.data.some((p: any) => p.pitchId === testPitchId);
   assert(publishedVisible, 'Published platform pitch is visible in investor deal room');
+
+  // Direct request for published pitch ID returns 200 with full venture details
+  const directPubRes = await fetch(`${API_BASE}/investor/pitches/${testPitchId}`, {
+    headers: { Cookie: investorCookie },
+  });
+  assert(directPubRes.status === 200, 'Direct request for published pitch ID returns 200 OK');
+  const directPubJson = await directPubRes.json();
+  assert(directPubJson.pitch.pitchId === testPitchId, 'Direct pitch detail returns correct venture record');
 
   // Watchlist toggle
   const watchToggle1 = await fetch(`${API_BASE}/investor/watchlist/toggle`, {
@@ -359,6 +381,57 @@ async function runTests() {
   const retainedMsgsJson = await retainedMsgsRes.json();
   assert(retainedMsgsJson.conversationStatus === 'READ_ONLY', 'Conversation status is READ_ONLY');
   assert(retainedMsgsJson.messages.length === 2, 'All historical messages retained after connection ended');
+
+  // 9. Connection Withdrawal & Bidirectional Checks
+  console.log('\n--- 9. WITHDRAWAL & BIDIRECTIONAL CONNECTION CHECKS ---');
+  // Clean any prior requests for a fresh cycle
+  await dbPool.execute(
+    `DELETE FROM connection_request WHERE (investor_user_id = ? AND founder_user_id = ?) OR (investor_user_id = ? AND founder_user_id = ?)`,
+    [investorUser.user_id, founderUser.user_id, founderUser.user_id, investorUser.user_id],
+  );
+
+  // Investor sends new connection request
+  const newConnRes = await fetch(`${API_BASE}/connections/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: investorCookie },
+    body: JSON.stringify({
+      pitchId: testPitchId,
+      initialMessage: 'Second cycle connection request.',
+    }),
+  });
+  assert(newConnRes.status === 201, 'Second cycle connection request created (201)');
+  const newConnJson = await newConnRes.json();
+  const withdrawTestId = newConnJson.requestId;
+
+  // Founder tries to withdraw investor's request (must fail 403)
+  const founderWithdrawRes = await fetch(`${API_BASE}/connections/${withdrawTestId}/withdraw`, {
+    method: 'POST',
+    headers: { Cookie: founderCookie },
+  });
+  assert(founderWithdrawRes.status === 403, 'Recipient cannot withdraw a request sent by someone else (403)');
+
+  // Intruder tries to withdraw (must fail 403)
+  const intruderWithdrawRes = await fetch(`${API_BASE}/connections/${withdrawTestId}/withdraw`, {
+    method: 'POST',
+    headers: { Cookie: intruderCookie },
+  });
+  assert(intruderWithdrawRes.status === 403, 'Intruder cannot withdraw a connection request (403)');
+
+  // Investor withdraws their own pending request (must succeed 200)
+  const investorWithdrawRes = await fetch(`${API_BASE}/connections/${withdrawTestId}/withdraw`, {
+    method: 'POST',
+    headers: { Cookie: investorCookie },
+  });
+  assert(investorWithdrawRes.status === 200, 'Investor successfully withdrew their pending request (200)');
+  const withdrawJson = await investorWithdrawRes.json();
+  assert(withdrawJson.request.requestStatus === 'WITHDRAWN', 'Request status transitioned to WITHDRAWN');
+
+  // Attempting to withdraw again on already withdrawn request must fail 400
+  const reWithdrawRes = await fetch(`${API_BASE}/connections/${withdrawTestId}/withdraw`, {
+    method: 'POST',
+    headers: { Cookie: investorCookie },
+  });
+  assert(reWithdrawRes.status === 400, 'Cannot withdraw an already WITHDRAWN request (400)');
 
   console.log('\n====================================================');
   console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
