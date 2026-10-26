@@ -13,18 +13,19 @@ export interface SaudaLoaderProps {
 }
 
 export const SaudaLoader: React.FC<SaudaLoaderProps> = ({
-  message = 'INITIALIZING VENTURE INTELLIGENCE',
+  message = 'Entering Sauda',
   fullScreen = true,
   className = '',
-  accessibleLabel = 'Loading Sauda Platform',
+  accessibleLabel = 'Loading Sauda',
 }) => {
   return (
     <div
       className={`sauda-loader-wrapper ${fullScreen ? 'fullscreen-stage' : 'inline-stage'} ${className}`}
       role="status"
       aria-live="polite"
-      aria-label={accessibleLabel}
+      aria-busy="true"
     >
+      <span className="loader-sr-only">{accessibleLabel}</span>
       <div className="loader-ambient-bloom" aria-hidden="true" />
 
       {/* Orbit System */}
@@ -48,7 +49,13 @@ export const SaudaLoader: React.FC<SaudaLoaderProps> = ({
 
         {/* The Orbiting Shark Silhouette */}
         <div className="shark-orbit-arm">
+          {/* Wake: a fading arc of disturbed water trailing behind the shark */}
+          <div className="shark-wake" />
           <div className="shark-runner">
+            {/* Intermittent bubbles shed from the tail */}
+            <span className="shark-bubble bubble-1" />
+            <span className="shark-bubble bubble-2" />
+            <span className="shark-bubble bubble-3" />
             <div className="shark-body-flex">
               <svg className="shark-svg" viewBox="0 0 54 22" fill="none">
                 <defs>
@@ -107,15 +114,12 @@ export const SaudaLoader: React.FC<SaudaLoaderProps> = ({
         <p className="loader-subtitle">THE STARTUP EXCHANGE</p>
 
         {message && (
-          <div className="loader-telemetry-row">
-            <span className="telemetry-indicator-dot" aria-hidden="true" />
+          <div className="loader-telemetry-row" aria-hidden="true">
+            <span className="telemetry-indicator-dot" />
             <span className="loader-caption">{message}</span>
           </div>
         )}
 
-        <div className="loader-shimmer-bar" aria-hidden="true">
-          <div className="shimmer-progress-sweep" />
-        </div>
       </div>
     </div>
   );

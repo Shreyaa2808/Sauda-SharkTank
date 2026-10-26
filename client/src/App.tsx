@@ -10,6 +10,7 @@ import { AccountMenu } from './components/auth/AccountMenu.tsx';
 import { ProfilePage } from './components/profile/ProfilePage.tsx';
 import { AccountSettingsPage } from './components/settings/AccountSettingsPage.tsx';
 import { WorkspaceChooserModal } from './components/workspace/WorkspaceChooserModal.tsx';
+import { NavDrawer } from './components/navigation/NavDrawer.tsx';
 import { WorkspaceGate } from './components/workspace/WorkspaceGate.tsx';
 import { FounderWorkspace } from './components/founder/FounderWorkspace.tsx';
 import { InvestorWorkspace } from './components/investor/InvestorWorkspace.tsx';
@@ -17,6 +18,9 @@ import { ConnectionsHub } from './components/connections/ConnectionsHub.tsx';
 import { StartupDetailModal } from './components/startup/StartupDetailModal.tsx';
 import { ComparisonTray } from './components/compare/ComparisonTray.tsx';
 import { ComparisonMatrix } from './components/compare/ComparisonMatrix.tsx';
+import { DiscoveryHero } from './components/home/DiscoveryHero.tsx';
+import { NotFoundPage } from './components/notfound/NotFoundPage.tsx';
+import { computeRegistryMetrics } from './utils/registryMetrics.ts';
 import { fetchStartups } from './services/api.ts';
 import { checkSession, logout, type AuthUser } from './services/auth.ts';
 import type { PitchType, Startup } from './types/startup.ts';
@@ -28,10 +32,16 @@ import {
 } from './utils/formatters.ts';
 
 type FilterType = 'ALL' | PitchType;
-type AppRoute = 'discovery' | 'login' | 'profile' | 'settings' | 'founder' | 'investor' | 'connections';
+type KnownRoute = 'discovery' | 'login' | 'profile' | 'settings' | 'founder' | 'investor' | 'connections';
+// 'notfound' is a real view for unrecognised URLs; it has no path of its own (the address bar keeps the requested URL).
+type AppRoute = KnownRoute | 'notfound';
+
+// The public API caps a page at 100 rows; hitting the cap means KPI totals are a lower bound.
+const STARTUP_FETCH_LIMIT = 100;
+const MIN_LOADER_MS = 1400;
 
 // Single source of truth for the (History API based) route model.
-const ROUTE_PATHS: Record<AppRoute, string> = {
+const ROUTE_PATHS: Record<KnownRoute, string> = {
   discovery: '/',
   login: '/login',
   profile: '/profile',
@@ -43,12 +53,30 @@ const ROUTE_PATHS: Record<AppRoute, string> = {
 
 // Routes that need a server-verified session. Role checks for workspaces are layered on top.
 const AUTH_REQUIRED_ROUTES: AppRoute[] = ['profile', 'settings', 'founder', 'investor', 'connections'];
+const ROUTE_LABELS: Record<AppRoute, string> = {
+  notfound: 'Page Not Found',
+  discovery: 'Startup Discovery',
+  login: 'Sign In',
+  profile: 'Profile',
+  settings: 'Account Settings',
+  founder: 'Founder Workspace',
+  investor: 'Investor Deal Room',
+  connections: 'Connections',
+};
 const WORKSPACE_ROUTES: AppRoute[] = ['founder', 'investor', 'connections'];
 
 const pathToRoute = (rawPath: string): AppRoute => {
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
-  const match = (Object.keys(ROUTE_PATHS) as AppRoute[]).find((r) => ROUTE_PATHS[r] === path);
-  return match ?? 'discovery';
+  const match = (Object.keys(ROUTE_PATHS) as KnownRoute[]).find((r) => ROUTE_PATHS[r] === path);
+  // Unrecognised URLs are a genuine 404, never silently the homepage.
+  return match ?? 'notfound';
+};
+
+// Depth of the current history entry within Sauda (0 = the page the tab first loaded).
+// Stored in history.state so it survives refresh and tells us whether Back stays inside the app.
+const getHistoryDepth = (): number => {
+  const state = window.history.state as { saudaDepth?: unknown } | null;
+  return typeof state?.saudaDepth === 'number' ? state.saudaDepth : 0;
 };
 
 const getInitialRoute = (): AppRoute => {
@@ -84,6 +112,15 @@ export const App: React.FC = () => {
 
   // Initial application bootstrap completion states
   const [isInitialAuthDone, setIsInitialAuthDone] = useState<boolean>(false);
+  // Minimum on-screen time for the shark loader on page load, so fast (local) responses
+  // don't make it vanish before it can be seen. Only applies to the initial load, never to in-app navigation.
+  const [minLoaderElapsed, setMinLoaderElapsed] = useState<boolean>(false);
+  useEffect(() => {
+    const reduced =
+      typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timer = setTimeout(() => setMinLoaderElapsed(true), reduced ? 600 : MIN_LOADER_MS);
+    return () => clearTimeout(timer);
+  }, []);
   const [isInitialDataDone, setIsInitialDataDone] = useState<boolean>(false);
 
   // Authentication & Access Routing State
@@ -91,6 +128,9 @@ export const App: React.FC = () => {
   const [requestedRoute, setRequestedRoute] = useState<AppRoute>(getInitialRoute);
   // Workspace Chooser Modal State
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState<boolean>(false);
+  // Left navigation drawer
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const hamburgerRef = React.useRef<HTMLButtonElement>(null);
 
   // Detail Modal & Comparison Matrix States
   const [selectedDetailStartup, setSelectedDetailStartup] = useState<Startup | null>(null);
@@ -100,22 +140,24 @@ export const App: React.FC = () => {
 
   // Navigation helper synchronized with browser History API.
   // `replace` is used for guard redirects so Back never lands on a page the guard just rejected.
-  const navigateTo = useCallback((route: AppRoute, replace = false) => {
+  const navigateTo = useCallback((route: KnownRoute, replace = false) => {
     setRequestedRoute(route);
     const path = ROUTE_PATHS[route];
     if (window.location.pathname !== path) {
-      if (replace) window.history.replaceState(null, '', path);
-      else window.history.pushState(null, '', path);
+      const depth = getHistoryDepth();
+      if (replace) window.history.replaceState({ saudaDepth: depth }, '', path);
+      else window.history.pushState({ saudaDepth: depth + 1 }, '', path);
     }
     window.scrollTo?.({ top: 0 });
   }, []);
 
   // Route to resume after a guard-triggered sign-in (never trusted for authorization).
-  const returnToRef = React.useRef<AppRoute | null>(null);
+  const returnToRef = React.useRef<KnownRoute | null>(null);
 
   // Synchronize browser back/forward buttons with currentRoute
   useEffect(() => {
     const handlePopState = () => {
+      setIsDrawerOpen(false);
       setRequestedRoute(pathToRoute(window.location.pathname));
     };
     window.addEventListener('popstate', handlePopState);
@@ -149,7 +191,7 @@ export const App: React.FC = () => {
 
   // Route guard: derived during render so direct URL entry, refresh, Back/Forward and logout
   // can never display a protected view without a server-verified session.
-  const guardRedirect: AppRoute | null = !isInitialAuthDone
+  const guardRedirect: KnownRoute | null = !isInitialAuthDone
     ? null
     : !currentUser && AUTH_REQUIRED_ROUTES.includes(requestedRoute)
       ? 'login'
@@ -161,9 +203,9 @@ export const App: React.FC = () => {
   // Keep the address bar in step with a guard redirect (history only; no state updates here).
   useEffect(() => {
     if (!guardRedirect) return;
-    if (guardRedirect === 'login') returnToRef.current = requestedRoute;
+    if (guardRedirect === 'login' && requestedRoute !== 'notfound') returnToRef.current = requestedRoute;
     const path = ROUTE_PATHS[guardRedirect];
-    if (window.location.pathname !== path) window.history.replaceState(null, '', path);
+    if (window.location.pathname !== path) window.history.replaceState({ saudaDepth: getHistoryDepth() }, '', path);
   }, [guardRedirect, requestedRoute]);
 
   // Re-verify roles with the server whenever a workspace route is entered, so a stale
@@ -201,7 +243,12 @@ export const App: React.FC = () => {
     !isInitialAuthDone || (currentRoute === 'discovery' && !isInitialDataDone && !error);
 
   // Show the dedicated SaudaLoader during refresh / initial bootstrap when intro is NOT playing
-  const showBootstrapLoader = !introActive && isBootstrapPending;
+  const showBootstrapLoader = !introActive && (isBootstrapPending || !minLoaderElapsed);
+
+  // Keep the tab title in step with the visible section
+  useEffect(() => {
+    document.title = `${ROUTE_LABELS[currentRoute]} · Sauda`;
+  }, [currentRoute]);
 
   // Transition handler when cinematic intro completes
   const handleIntroComplete = () => {
@@ -213,10 +260,14 @@ export const App: React.FC = () => {
     }
     // Signed-out visitors land on the login page (guest entry is offered there);
     // signed-in users continue to the URL they requested. Guards enforce the rest.
-    if (!currentUserRef.current) {
+    const requested = pathToRoute(window.location.pathname);
+    if (requested === 'notfound') {
+      // Keep the unknown URL visible as a 404 for everyone.
+      setRequestedRoute('notfound');
+    } else if (!currentUserRef.current) {
       navigateTo('login', true);
     } else {
-      navigateTo(pathToRoute(window.location.pathname), true);
+      navigateTo(requested, true);
     }
   };
 
@@ -224,6 +275,7 @@ export const App: React.FC = () => {
   const handleLogout = async () => {
     await logout();
     returnToRef.current = null;
+    setIsDrawerOpen(false);
     setIsWorkspaceModalOpen(false);
     setCurrentUser(null);
     navigateTo('login');
@@ -253,7 +305,7 @@ export const App: React.FC = () => {
       setError('');
 
       try {
-        const response = await fetchStartups(50, controller.signal);
+        const response = await fetchStartups(STARTUP_FETCH_LIMIT, controller.signal);
         setStartups(response.data);
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
@@ -298,36 +350,20 @@ export const App: React.FC = () => {
     });
   }, [startups, search, filter]);
 
-  // Telemetry Aggregates for Modern Finance Hero Ribbon
-  const metrics = useMemo(() => {
-    const totalCount = startups.length;
-    const showCount = startups.filter((s) => s.pitchType === 'SHOW').length;
-    const platformCount = startups.filter((s) => s.pitchType === 'PLATFORM').length;
-    const totalAsk = startups.reduce((acc, s) => acc + (Number(s.originalAskAmount) || 0), 0);
-    const avgEquity =
-      totalCount > 0
-        ? startups.reduce((acc, s) => acc + (Number(s.originalAskEquityPct) || 0), 0) / totalCount
-        : 0;
-
-    return {
-      totalCount,
-      showCount,
-      platformCount,
-      totalAsk,
-      avgEquity,
-    };
-  }, [startups]);
+  // KPI aggregates derived strictly from published records (invalid/missing values excluded, never zero-filled)
+  const metrics = useMemo(() => computeRegistryMetrics(startups), [startups]);
+  const isRegistryCapped = startups.length >= STARTUP_FETCH_LIMIT;
 
   const handleClearFilters = () => {
     setSearch('');
     setFilter('ALL');
   };
 
-  const scrollToExplorer = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
+  const scrollToExplorer = () => {
     const el = document.getElementById('explorer');
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
     }
   };
 
@@ -378,7 +414,7 @@ export const App: React.FC = () => {
           <CinematicIntro onComplete={handleIntroComplete} />
         )}
         {showBootstrapLoader && (
-          <SaudaLoader message="INITIALIZING IDENTITY SERVICES" />
+          <SaudaLoader message="Entering Sauda" />
         )}
         <LoginPage
           onLoginSuccess={handleLoginSuccess}
@@ -397,126 +433,68 @@ export const App: React.FC = () => {
 
       {/* 0.1 PREMIUM REFRESH / BOOTSTRAP LOADER */}
       {showBootstrapLoader && (
-        <SaudaLoader message="SYNCHRONIZING VENTURE INTELLIGENCE" />
+        <SaudaLoader message="Loading venture registry" />
       )}
 
       {/* 1. DARK NAVY NAVIGATION HEADER */}
       <header className="topbar">
-        <a
-          className="brand"
-          href="/"
-          onClick={(e) => {
-            e.preventDefault();
-            navigateTo('discovery');
-          }}
-          aria-label="Sauda Home"
-        >
-          <div className="brand-crest" aria-hidden="true">
-            <svg viewBox="0 0 36 36" fill="none" width="22" height="22">
-              <path
-                d="M18 2 L32 7 V18 C32 26 26 32 18 35 C10 32 4 26 4 18 V7 L18 2 Z"
-                fill="#0A1929"
-                stroke="#C3A064"
-                strokeWidth="1.5"
-              />
-              <path
-                d="M12 24 C14 24 16 22 17 19 C18 15 19 10 24 9 C22 13 22 18 25 21 C22 22 18 24 12 24 Z"
-                fill="#C3A064"
-              />
-            </svg>
-          </div>
-          <div className="brand-copy">
-            <strong>
-              sauda<span>.</span>
-            </strong>
-            <small>THE STARTUP EXCHANGE</small>
-          </div>
-        </a>
+        <div className="topbar-left">
+          <button
+            ref={hamburgerRef}
+            type="button"
+            className={`topbar-hamburger ${isDrawerOpen ? 'active' : ''}`}
+            onClick={() => setIsDrawerOpen((open) => !open)}
+            aria-label={isDrawerOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isDrawerOpen}
+            aria-controls="app-nav-drawer"
+            aria-haspopup="dialog"
+          >
+            <span className="hamburger-bars" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </button>
 
-        <nav className="topbar-nav" aria-label="Primary navigation">
           <a
-            className={`nav-link ${currentRoute === 'discovery' ? 'active' : ''}`}
+            className="brand"
             href="/"
             onClick={(e) => {
               e.preventDefault();
               navigateTo('discovery');
             }}
+            aria-label="Sauda Home"
           >
-            Discover
+            <div className="brand-crest" aria-hidden="true">
+              <svg viewBox="0 0 36 36" fill="none" width="22" height="22">
+                <path
+                  d="M18 2 L32 7 V18 C32 26 26 32 18 35 C10 32 4 26 4 18 V7 L18 2 Z"
+                  fill="#0A1929"
+                  stroke="#C3A064"
+                  strokeWidth="1.5"
+                />
+                <path
+                  d="M12 24 C14 24 16 22 17 19 C18 15 19 10 24 9 C22 13 22 18 25 21 C22 22 18 24 12 24 Z"
+                  fill="#C3A064"
+                />
+              </svg>
+            </div>
+            <div className="brand-copy">
+              <strong>
+                sauda<span>.</span>
+              </strong>
+              <small>THE STARTUP EXCHANGE</small>
+            </div>
           </a>
-          <a
-            className="nav-link"
-            href="#explorer"
-            onClick={(e) => {
-              if (currentRoute !== 'discovery') {
-                e.preventDefault();
-                navigateTo('discovery');
-                setTimeout(() => {
-                  const el = document.getElementById('explorer');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              } else {
-                scrollToExplorer(e);
-              }
-            }}
-          >
-            Startup Explorer
-          </a>
-          {currentUser && hasRole('FOUNDER') && (
-            <a
-              className={`nav-link ${currentRoute === 'founder' ? 'active' : ''}`}
-              href="/founder"
-              onClick={(e) => {
-                e.preventDefault();
-                navigateTo('founder');
-              }}
-              aria-current={currentRoute === 'founder' ? 'page' : undefined}
-            >
-              Founder
-            </a>
-          )}
-          {currentUser && hasRole('INVESTOR') && (
-            <a
-              className={`nav-link ${currentRoute === 'investor' ? 'active' : ''}`}
-              href="/investor"
-              onClick={(e) => {
-                e.preventDefault();
-                navigateTo('investor');
-              }}
-              aria-current={currentRoute === 'investor' ? 'page' : undefined}
-            >
-              Deal Room
-            </a>
-          )}
-          {currentUser && (hasRole('FOUNDER') || hasRole('INVESTOR')) && (
-            <a
-              className={`nav-link ${currentRoute === 'connections' ? 'active' : ''}`}
-              href="/connections"
-              onClick={(e) => {
-                e.preventDefault();
-                navigateTo('connections');
-              }}
-              aria-current={currentRoute === 'connections' ? 'page' : undefined}
-            >
-              Connections
-            </a>
-          )}
-        </nav>
+
+          <span className="topbar-context" aria-label="Current section">
+            <span className="topbar-context-divider" aria-hidden="true" />
+            <span className="topbar-context-label">{ROUTE_LABELS[currentRoute]}</span>
+          </span>
+        </div>
 
         <div className="topbar-right">
           {/* Real Authentication State: Account Menu or Sign In CTA */}
-          {currentUser && (
-            <button
-              type="button"
-              className="topbar-workspace-btn"
-              onClick={() => setIsWorkspaceModalOpen(true)}
-              aria-haspopup="dialog"
-              title="Switch or activate a workspace"
-            >
-              <span aria-hidden="true">▦</span>
-              <span>Workspaces</span>
-            </button>
-          )}
           {currentUser ? (
             <AccountMenu
               user={currentUser}
@@ -608,7 +586,31 @@ export const App: React.FC = () => {
         )
       )}
 
-      {/* WORKSPACE CHOOSER MODAL */}
+      {/* NOT FOUND: unrecognised URLs never fall through to discovery */}
+      {currentRoute === 'notfound' && (
+        <NotFoundPage
+          requestedPath={typeof window !== 'undefined' ? window.location.pathname : ''}
+          isSignedIn={Boolean(currentUser)}
+          canGoBack={getHistoryDepth() > 0}
+          onGoHome={() => navigateTo('discovery')}
+          onGoBack={() => window.history.back()}
+          onSignIn={() => navigateTo('login')}
+        />
+      )}
+
+      {/* LEFT NAVIGATION DRAWER */}
+      <NavDrawer
+        isOpen={isDrawerOpen}
+        currentRoute={currentRoute}
+        currentUser={currentUser}
+        onClose={() => setIsDrawerOpen(false)}
+        onNavigate={(route) => navigateTo(route)}
+        onOpenWorkspaces={() => setIsWorkspaceModalOpen(true)}
+        onSignIn={() => navigateTo('login')}
+        onLogout={handleLogout}
+        returnFocusRef={hamburgerRef}
+      />
+
       {isWorkspaceModalOpen && (
         <WorkspaceChooserModal
           currentUser={currentUser}
@@ -627,79 +629,20 @@ export const App: React.FC = () => {
       {currentRoute === 'discovery' && (
         <>
           {/* 2. MODERN FINANCE HERO & PLATFORM TELEMETRY */}
-          <section className="finance-hero" id="hero">
-        <div className="finance-hero-inner">
-          <div className="finance-hero-eyebrow">
-            <span className="eyebrow-accent-rule" />
-            <span>VENTURE CAPITAL INTELLIGENCE & DEAL REGISTRY</span>
-          </div>
-
-          <h1 className="finance-hero-headline">
-            Institutional Discovery for India's Next Generation Ventures.
-          </h1>
-
-          <p className="finance-hero-subtext">
-            Standardized academic intelligence on televised Shark Tank pitches and registered platform listings. Track ask valuations, equity dilution, founder business models, and verified corporate registry attributes.
-          </p>
-
-          <div className="finance-hero-actions">
-            <a
-              className="finance-primary-btn"
-              href="#explorer"
-              onClick={scrollToExplorer}
-              aria-label="Scroll to Startup Explorer"
-            >
-              <span>Explore Venture Registry</span>
-              <span className="finance-btn-arrow" aria-hidden="true">↓</span>
-            </a>
-
-            <div className="finance-compliance-badge">
-              <span className="badge-shield" aria-hidden="true">✦</span>
-              <span>MySQL 8.0 ACID REGISTRY · ACADEMIC PROTOCOL</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Real Dynamic Telemetry Ribbon */}
-        <div className="finance-metrics-ribbon" aria-label="Ecosystem telemetry summary">
-          <div className="finance-metric-card">
-            <span className="metric-label">PUBLISHED VENTURES</span>
-            <strong className="metric-value">
-              {loading ? '—' : String(metrics.totalCount).padStart(2, '0')}
-            </strong>
-            <span className="metric-subtext">Total active portfolio</span>
-          </div>
-
-          <div className="finance-metric-card">
-            <span className="metric-label">SOURCE DISTRIBUTION</span>
-            <div className="metric-source-split">
-              <span className="source-pill show-pill">
-                <strong>{loading ? '—' : metrics.showCount}</strong> Shark Tank
-              </span>
-              <span className="source-pill platform-pill">
-                <strong>{loading ? '—' : metrics.platformCount}</strong> Platform
-              </span>
-            </div>
-            <span className="metric-subtext">Strict dual-source separation</span>
-          </div>
-
-          <div className="finance-metric-card">
-            <span className="metric-label">TOTAL CAPITAL ASKED</span>
-            <strong className="metric-value tabular-nums">
-              {loading ? '—' : formatCurrency(metrics.totalAsk)}
-            </strong>
-            <span className="metric-subtext">Aggregate investment ask</span>
-          </div>
-
-          <div className="finance-metric-card">
-            <span className="metric-label">AVG. REQUESTED EQUITY</span>
-            <strong className="metric-value tabular-nums">
-              {loading ? '—' : formatEquity(metrics.avgEquity)}
-            </strong>
-            <span className="metric-subtext">Across evaluated pitches</span>
-          </div>
-        </div>
-      </section>
+          <DiscoveryHero
+            loading={loading}
+            hasError={Boolean(error)}
+            metrics={metrics}
+            isCapped={isRegistryCapped}
+            startups={startups}
+            onSelectStartup={setSelectedDetailStartup}
+            onExplore={scrollToExplorer}
+            onBrowseShow={() => {
+              setSearch('');
+              setFilter('SHOW');
+              scrollToExplorer();
+            }}
+          />
 
       {/* 3. STARTUP EXPLORER SECTION */}
       <section className="explorer" id="explorer">
@@ -728,34 +671,22 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Clean Deal Desk Advisory Notice (Replaces Childish Cartoon) */}
-        <div className="deal-desk-notice">
-          <div className="notice-left">
-            <div className="notice-icon-box" aria-hidden="true">
-              <span>⚖</span>
-            </div>
-            <div className="notice-copy">
-              <strong>Institutional Deal Intelligence</strong>
-              <p>
-                {filter === 'ALL'
-                  ? `Showing all ${visibleStartups.length} published records across televised pitches and registered platform ventures.`
-                  : filter === 'SHOW'
-                    ? `Showing ${visibleStartups.length} televised Shark Tank India pitches archived with original valuation asks.`
-                    : `Showing ${visibleStartups.length} registered independent platform listings awaiting investor syndicated discovery.`}
-                {search.trim() ? ` Filtered by "${search}".` : ''}
-              </p>
-            </div>
-          </div>
-          {(search || filter !== 'ALL') && (
-            <button
-              type="button"
-              className="notice-clear-btn"
-              onClick={handleClearFilters}
-            >
-              Reset Filters
+        {/* Slim results bar: only shown while a search or source filter is narrowing the registry */}
+        {(search.trim() || filter !== 'ALL') && (
+          <div className="results-bar" role="status" aria-live="polite">
+            <p>
+              Showing <strong>{visibleStartups.length}</strong> of {startups.length}{' '}
+              {startups.length === 1 ? 'venture' : 'ventures'}
+              {filter !== 'ALL' && (
+                <span className="results-chip">{filter === 'SHOW' ? 'Shark Tank' : 'Platform'}</span>
+              )}
+              {search.trim() && <span className="results-chip">&ldquo;{search.trim()}&rdquo;</span>}
+            </p>
+            <button type="button" className="results-reset" onClick={handleClearFilters}>
+              Reset filters
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Toolbar: Search & Pitch-type Filters */}
         <div className="toolbar">
@@ -967,22 +898,35 @@ export const App: React.FC = () => {
             })}
           </div>
         ) : !error ? (
-          /* Empty Search Feedback */
-          <div className="feedback-panel empty-panel">
-            <div className="empty-symbol" aria-hidden="true">⚖</div>
-            <h3>No ventures found matching search criteria</h3>
-            <p>
-              We couldn't find any startups matching "{search}". Try searching
-              for another sector, city, or reset your filters.
-            </p>
-            <button
-              type="button"
-              className="panel-btn"
-              onClick={handleClearFilters}
-            >
-              Reset search filters
-            </button>
-          </div>
+          startups.length === 0 ? (
+            /* The registry itself is empty: never imply a search problem */
+            <div className="feedback-panel empty-panel">
+              <div className="empty-symbol" aria-hidden="true">⚖</div>
+              <h3>No ventures have been published yet</h3>
+              <p>
+                The registry has no published pitches at the moment. Published Shark Tank pitches and
+                platform listings will appear here.
+              </p>
+              <button type="button" className="panel-btn" onClick={() => setReloadKey((k) => k + 1)}>
+                Refresh registry
+              </button>
+            </div>
+          ) : (
+            /* Empty Search Feedback */
+            <div className="feedback-panel empty-panel">
+              <div className="empty-symbol" aria-hidden="true">⚖</div>
+              <h3>No ventures match your search</h3>
+              <p>
+                {search.trim()
+                  ? `We couldn't find any startups matching "${search.trim()}"${filter !== 'ALL' ? ' in this source' : ''}. `
+                  : 'No startups are available for this source. '}
+                Try another sector, city or stage, or reset your filters.
+              </p>
+              <button type="button" className="panel-btn" onClick={handleClearFilters}>
+                Reset search filters
+              </button>
+            </div>
+          )
         ) : null}
 
         {/* Academic Data Note */}

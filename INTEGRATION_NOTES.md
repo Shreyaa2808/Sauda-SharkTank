@@ -3,8 +3,9 @@
 ## Files changed
 - `client/src/App.tsx` — route table, guards, role-aware nav, workspace switch button, login-resume
 - `client/src/components/workspace/WorkspaceGate.tsx` — NEW, shared sign-in / access-denied / activation panel
-- `client/src/components/workspace/WorkspaceChooserModal.tsx` — Escape to close, focus on open
+- `client/src/components/workspace/WorkspaceChooserModal.tsx` — Escape to close, Tab focus trap, focus restored to opener
 - `client/src/components/auth/AccountMenu.tsx` — shows all assigned roles
+- `client/src/services/auth.ts` — `checkSession` times out after 10s (treated as signed out) so a hung API never leaves the loader up
 
 No server files, migrations, DB config or env files were touched.
 
