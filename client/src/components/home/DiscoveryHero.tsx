@@ -20,77 +20,147 @@ interface DiscoveryHeroProps {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/** Live preview of the most recent published records: real data, each row opens the startup's details. */
-const RegistryPreview: React.FC<{
+const ROTATE_MS = 6000;
+const FEATURED_COUNT = 5;
+const VIDEO_SRC = '/media/sauda-pitch-arena.mp4';
+const VIDEO_POSTER = '/media/sauda-pitch-arena-poster.jpg';
+
+/** Subscribe to a CSS media query without effects (SSR-safe, updates live). */
+function useMediaQuery(query: string): boolean {
+  return React.useSyncExternalStore(
+    (notify) => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener('change', notify);
+      return () => mql.removeEventListener('change', notify);
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+/** Rotating spotlight over real registry records: one venture leaves, the next arrives. */
+const FeaturedSpotlight: React.FC<{
   startups: Startup[];
   loading: boolean;
   hasError: boolean;
+  reducedMotion: boolean;
   onSelect: (startup: Startup) => void;
   onViewAll: () => void;
-  total: number;
-}> = ({ startups, loading, hasError, onSelect, onViewAll, total }) => {
-  const rows = startups.slice(0, 3);
+}> = ({ startups, loading, hasError, reducedMotion, onSelect, onViewAll }) => {
+  const pool = React.useMemo(() => startups.slice(0, FEATURED_COUNT), [startups]);
+  const [rawIndex, setRawIndex] = React.useState(0);
+  const [userPaused, setUserPaused] = React.useState(false);
+  const [hovering, setHovering] = React.useState(false);
+
+  const count = pool.length;
+  const index = count > 0 ? rawIndex % count : 0;
+  const playing = count > 1 && !reducedMotion && !userPaused && !hovering;
+
+  React.useEffect(() => {
+    if (!playing) return;
+    const id = window.setInterval(() => setRawIndex((i) => i + 1), ROTATE_MS);
+    return () => window.clearInterval(id);
+  }, [playing, index]);
+
+  const go = (delta: number) => setRawIndex((i) => (count ? (i + delta + count * 1000) % count : 0));
+
+  if (loading) {
+    return (
+      <aside className="spotlight" aria-label="Featured venture" aria-busy="true">
+        <div className="spotlight-card is-skeleton">
+          <span className="rp-skel rp-skel-title" />
+          <span className="rp-skel rp-skel-sub" />
+          <span className="rp-skel rp-skel-block" />
+        </div>
+      </aside>
+    );
+  }
+
+  if (hasError || count === 0) {
+    return (
+      <aside className="spotlight" aria-label="Featured venture">
+        <div className="spotlight-card">
+          <p className="spotlight-eyebrow">Featured venture</p>
+          <p className="spotlight-empty">
+            {hasError ? 'The registry is unavailable right now.' : 'New ventures will appear here as they are published.'}
+          </p>
+        </div>
+      </aside>
+    );
+  }
+
+  const s = pool[index];
+  const next = pool[(index + 1) % count];
+  const isPlatform = s.pitchType === 'PLATFORM';
+  const hasAsk = s.originalAskAmount !== null && Number(s.originalAskAmount) > 0;
+  const hasEq = s.originalAskEquityPct !== null && Number(s.originalAskEquityPct) > 0;
 
   return (
-    <aside className="registry-preview" aria-label="Latest published ventures">
-      <header className="registry-preview-head">
-        <span className="registry-preview-title">Latest in the registry</span>
-        <span className="registry-preview-live" aria-hidden="true" />
-      </header>
+    <aside
+      className="spotlight"
+      aria-label="Featured venture"
+      aria-roledescription="carousel"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      onFocus={() => setHovering(true)}
+      onBlur={() => setHovering(false)}
+    >
+      {count > 1 && <div className="spotlight-ghost" aria-hidden="true">{next.brandName}</div>}
 
-      {loading ? (
-        <ul className="registry-preview-list" aria-hidden="true">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="registry-preview-row is-skeleton">
-              <span className="rp-skel rp-skel-title" />
-              <span className="rp-skel rp-skel-sub" />
-            </li>
-          ))}
-        </ul>
-      ) : hasError ? (
-        <p className="registry-preview-empty">The registry is unavailable right now.</p>
-      ) : rows.length === 0 ? (
-        <p className="registry-preview-empty">No ventures have been published yet.</p>
-      ) : (
-        <ul className="registry-preview-list">
-          {rows.map((s) => {
-            const isPlatform = s.pitchType === 'PLATFORM';
-            const ask = s.originalAskAmount !== null && Number(s.originalAskAmount) > 0;
-            const eq = s.originalAskEquityPct !== null && Number(s.originalAskEquityPct) > 0;
-            return (
-              <li key={s.pitchId}>
-                <button
-                  type="button"
-                  className="registry-preview-row"
-                  onClick={() => onSelect(s)}
-                  aria-label={`View details for ${s.brandName}`}
-                >
-                  <span className="rp-main">
-                    <span className="rp-name">{s.brandName}</span>
-                    <span className="rp-meta">
-                      <span className={`rp-source ${isPlatform ? 'platform' : 'show'}`}>
-                        {isPlatform ? 'Platform' : 'Shark Tank'}
-                      </span>
-                      {s.industry && <span className="rp-industry">{s.industry}</span>}
-                    </span>
-                  </span>
-                  <span className="rp-figures">
-                    <span className="rp-ask">{ask ? formatCurrencyCompact(s.originalAskAmount) : 'Ask not stated'}</span>
-                    {eq && <span className="rp-equity">{formatEquity(s.originalAskEquityPct, 1)} equity</span>}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <div className="spotlight-card" key={s.pitchId} aria-live={playing ? 'off' : 'polite'}>
+        <div className="spotlight-top">
+          <p className="spotlight-eyebrow">Featured venture</p>
+          {count > 1 && (
+            <div className="spotlight-controls">
+              <button type="button" onClick={() => setUserPaused((p) => !p)} aria-label={playing || !userPaused ? 'Pause rotation' : 'Resume rotation'} disabled={reducedMotion} className="spotlight-pause">
+                {userPaused || reducedMotion ? '▶' : '❚❚'}
+              </button>
+              <button type="button" onClick={() => go(-1)} aria-label="Previous venture">←</button>
+              <button type="button" onClick={() => go(1)} aria-label="Next venture">→</button>
+            </div>
+          )}
+        </div>
 
-      {!loading && !hasError && total > rows.length && (
-        <button type="button" className="registry-preview-all" onClick={onViewAll}>
-          View all {total}
-          <span aria-hidden="true"> →</span>
+        <div className="spotlight-head">
+          <span className="spotlight-mark" aria-hidden="true">{s.brandName.charAt(0).toUpperCase()}</span>
+          <div className="spotlight-title">
+            <h2>{s.brandName}</h2>
+            <span className={`rp-source ${isPlatform ? 'platform' : 'show'}`}>{isPlatform ? 'Platform' : 'Shark Tank'}</span>
+          </div>
+        </div>
+
+        <p className="spotlight-hook">{s.pitchHook || [s.industry, s.startupStage].filter(Boolean).join(' · ') || 'Published venture'}</p>
+
+        <dl className="spotlight-stats">
+          <div>
+            <dt>Capital asked</dt>
+            <dd>{hasAsk ? formatCurrencyCompact(s.originalAskAmount) : '—'}</dd>
+          </div>
+          <div>
+            <dt>Equity</dt>
+            <dd>{hasEq ? formatEquity(s.originalAskEquityPct, 1) : '—'}</dd>
+          </div>
+          <div>
+            <dt>{s.industry ? 'Sector' : 'Source'}</dt>
+            <dd className="is-text">{s.industry || (isPlatform ? 'Platform' : 'Shark Tank')}</dd>
+          </div>
+        </dl>
+
+        <button type="button" className="spotlight-cta" onClick={() => onSelect(s)} aria-label={`View details for ${s.brandName}`}>
+          View details <span aria-hidden="true">→</span>
         </button>
-      )}
+
+        <div className="spotlight-foot">
+          <div className="spotlight-dots" aria-hidden="true">
+            {pool.map((p, i) => (
+              <span key={p.pitchId} className={i === index ? 'on' : ''} />
+            ))}
+          </div>
+          <button type="button" className="spotlight-all" onClick={onViewAll}>
+            Browse all ventures
+          </button>
+        </div>
+      </div>
     </aside>
   );
 };
@@ -133,46 +203,64 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
         ? 'No equity recorded'
         : `Mean of ${metrics.equitySampleCount} stated ${metrics.equitySampleCount === 1 ? 'value' : 'values'}`;
 
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const compactScreen = useMediaQuery('(max-width: 768px)');
+  const [videoFailed, setVideoFailed] = React.useState(false);
+  const showVideo = !reducedMotion && !compactScreen && !videoFailed;
+
   return (
     <section className="home-hero" id="hero" aria-labelledby="home-hero-title">
-      <div className="home-hero-grid-bg" aria-hidden="true" />
+      <div className="home-hero-stage" aria-hidden="true">
+        {showVideo && (
+          <video
+            className="home-hero-video"
+            src={VIDEO_SRC}
+            poster={VIDEO_POSTER}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            tabIndex={-1}
+            onError={() => setVideoFailed(true)}
+          />
+        )}
+        <div className="home-hero-poster" style={{ backgroundImage: `url(${VIDEO_POSTER})` }} />
+        <div className="home-hero-shade" />
+        <div className="home-hero-lights" />
+      </div>
+
       <div className="home-hero-inner">
         <div className="home-hero-copy">
-          <p className="home-hero-eyebrow">
-            <span className="home-hero-eyebrow-rule" aria-hidden="true" />
-            Venture registry
-          </p>
+          <p className="home-hero-eyebrow">The Sauda pitch floor</p>
           <h1 id="home-hero-title" className="home-hero-title">
-            Discover India&rsquo;s next generation of ventures.
+            Ideas enter.
+            <span>Empires begin.</span>
           </h1>
           <p className="home-hero-lede">
-            Browse televised Shark Tank India pitches and startups listed directly on Sauda, side by side:
-            asks, equity, stage and business model in one registry.
+            Discover standout ventures, explore founder pitches, and find opportunities worth a closer look.
           </p>
 
           <div className="home-hero-actions">
             <button type="button" className="home-btn home-btn-primary" onClick={onExplore}>
-              <span>Explore the registry</span>
-              <span aria-hidden="true">↓</span>
+              <span>Explore the ventures</span>
+              <span aria-hidden="true">→</span>
             </button>
             <button type="button" className="home-btn home-btn-ghost" onClick={onBrowseShow}>
+              <span className="home-btn-play" aria-hidden="true">▶</span>
               Shark Tank archive
             </button>
           </div>
-
-          <p className="home-hero-note">
-            Sauda is an academic DBMS prototype. Records are demonstration data and are not verified.
-          </p>
         </div>
 
         <div className="home-hero-visual">
-          <RegistryPreview
+          <FeaturedSpotlight
             startups={startups}
             loading={pending}
             hasError={unavailable}
+            reducedMotion={reducedMotion}
             onSelect={onSelectStartup}
             onViewAll={onExplore}
-            total={metrics.totalCount}
           />
         </div>
       </div>

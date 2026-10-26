@@ -437,7 +437,7 @@ export const App: React.FC = () => {
       )}
 
       {/* 1. DARK NAVY NAVIGATION HEADER */}
-      <header className="topbar">
+      <header className={`topbar ${currentRoute === 'discovery' ? 'topbar--home' : ''}`}>
         <div className="topbar-left">
           <button
             ref={hamburgerRef}
@@ -492,6 +492,31 @@ export const App: React.FC = () => {
             <span className="topbar-context-label">{ROUTE_LABELS[currentRoute]}</span>
           </span>
         </div>
+
+        {currentRoute === 'discovery' && (
+          <>
+            <nav className="topbar-links" aria-label="Homepage sections">
+              <button type="button" className="is-current" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Home</button>
+              <button type="button" onClick={() => { setFilter('ALL'); scrollToExplorer(); }}>Venture Registry</button>
+              <button type="button" onClick={() => { setSearch(''); setFilter('SHOW'); scrollToExplorer(); }}>Shark Tank Archive</button>
+              <button type="button" onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>About</button>
+            </nav>
+            <form
+              className="topbar-search"
+              role="search"
+              onSubmit={(e) => { e.preventDefault(); scrollToExplorer(); }}
+            >
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search startups, sectors, cities…"
+                aria-label="Search startups"
+              />
+              <button type="submit" aria-label="Search">⌕</button>
+            </form>
+          </>
+        )}
 
         <div className="topbar-right">
           {/* Real Authentication State: Account Menu or Sign In CTA */}
@@ -656,8 +681,8 @@ export const App: React.FC = () => {
               Explore the Ecosystem<span>.</span>
             </h2>
             <p className="section-description">
-              Browse published records from the database. Historical show
-              pitches and platform listings are categorized distinctly.
+              Browse every published venture. Televised Shark Tank pitches
+              and platform listings are always labelled distinctly.
             </p>
           </div>
 
@@ -929,30 +954,29 @@ export const App: React.FC = () => {
           )
         ) : null}
 
-        {/* Academic Data Note */}
+        {/* Registry note */}
         <div className="data-note">
           <span className="data-note-mark" aria-hidden="true">
             i
           </span>
           <p>
-            Displaying active records from the Sauda MySQL database. Televised
-            pitches and registered platform ventures are maintained under
-            strict source separation.
+            Showing live records from the Sauda registry. Televised pitches and
+            ventures listed on the platform are always kept clearly separate.
           </p>
-          <span className="data-note-right">SAUDA · 2026 DBMS</span>
+          <span className="data-note-right">SAUDA · 2026</span>
         </div>
       </section>
 
       {/* 4. FOOTER */}
-      <footer className="footer">
+      <footer className="footer" id="about">
         <div className="footer-left">
           <a className="footer-brand" href="/" aria-label="Sauda Home">
             sauda<span>.</span>
           </a>
-          <p>Institutional Startup Intelligence & Venture Discovery Platform.</p>
+          <p>Startup discovery and founder–investor connections, in one place.</p>
         </div>
         <div className="footer-right">
-          <span className="footer-meta">ACADEMIC DBMS PROTOTYPE · 2026 · MYSQL 8.0</span>
+          <span className="footer-meta">© 2026 SAUDA · THE STARTUP EXCHANGE</span>
         </div>
       </footer>
 
