@@ -15,12 +15,24 @@ export interface AuthErrorResponse {
   message: string;
 }
 
+const SESSION_CHECK_TIMEOUT_MS = 10000;
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 /**
  * Check if the browser holds a valid authenticated session cookie.
  */
 export async function checkSession(signal?: AbortSignal): Promise<SessionState> {
+  // A hung API must never leave the app on the bootstrap loader: give up after SESSION_CHECK_TIMEOUT_MS
+  // and treat the visitor as signed out (the backend still enforces every protected request).
+  const controller = new AbortController();
+  const onExternalAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', onExternalAbort, { once: true });
+  }
+  const timer = setTimeout(() => controller.abort(), SESSION_CHECK_TIMEOUT_MS);
+
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
       method: 'GET',
@@ -28,7 +40,7 @@ export async function checkSession(signal?: AbortSignal): Promise<SessionState> 
       headers: {
         Accept: 'application/json',
       },
-      signal,
+      signal: controller.signal,
     });
 
     if (!res.ok) {
@@ -41,8 +53,12 @@ export async function checkSession(signal?: AbortSignal): Promise<SessionState> 
       user: data.user || null,
     };
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') throw err;
+    // Caller-initiated aborts propagate; timeouts and network failures resolve as signed out.
+    if (signal?.aborted && err instanceof Error && err.name === 'AbortError') throw err;
     return { authenticated: false, user: null };
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onExternalAbort);
   }
 }
 

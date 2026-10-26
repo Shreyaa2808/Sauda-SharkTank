@@ -20,6 +20,28 @@
   box-sizing: border-box;
 }
 
+/* Quick fade-in, no delay: on refresh the loader is meant to be seen (App enforces a minimum display time). */
+.sauda-loader-wrapper {
+  animation: saudaLoaderReveal 220ms ease both;
+}
+
+@keyframes saudaLoaderReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.loader-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .sauda-loader-wrapper.fullscreen-stage {
   position: fixed;
   inset: 0;
@@ -204,8 +226,55 @@
   top: 22px; /* Center is 74px; radius = 74 - 22 = 52px */
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 44px;
-  height: 18px;
+  width: 54px;
+  height: 22px;
+}
+
+/* Wake arc trailing counter-clockwise behind the shark (rotates with the arm) */
+.shark-wake {
+  position: absolute;
+  top: 22px;
+  left: 22px;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 292deg,
+    rgba(14, 165, 233, 0.04) 292deg,
+    rgba(125, 211, 252, 0.34) 340deg,
+    rgba(243, 231, 202, 0.55) 358deg,
+    transparent 360deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 48.5px, #000 49.5px, #000 52px, transparent 52.5px);
+  mask: radial-gradient(circle, transparent 48.5px, #000 49.5px, #000 52px, transparent 52.5px);
+  pointer-events: none;
+}
+
+/* Tail bubbles (animated in the arm's frame, so they trail the shark) */
+.shark-bubble {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 50%;
+  border: 1px solid rgba(186, 230, 253, 0.85);
+  background: rgba(186, 230, 253, 0.12);
+  opacity: 0;
+  animation: saudaBubble 2.6s ease-out infinite;
+  pointer-events: none;
+}
+
+.shark-bubble.bubble-1 { animation-delay: 0s; }
+.shark-bubble.bubble-2 { animation-delay: 0.9s; width: 3px; height: 3px; }
+.shark-bubble.bubble-3 { animation-delay: 1.7s; width: 5px; height: 5px; }
+
+@keyframes saudaBubble {
+  0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+  15% { opacity: 0.85; }
+  100% { transform: translate(-14px, -10px) scale(1.15); opacity: 0; }
 }
 
 .shark-body-flex {
@@ -304,36 +373,6 @@
   text-transform: uppercase;
 }
 
-/* Fine Shimmer Tracker Bar */
-.loader-shimmer-bar {
-  position: relative;
-  width: 130px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-  margin-top: 14px;
-  overflow: hidden;
-}
-
-.shimmer-progress-sweep {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 50%;
-  background: linear-gradient(90deg, transparent, #c3a064, transparent);
-  animation: saudaShimmerSweep 1.8s ease-in-out infinite;
-}
-
-@keyframes saudaShimmerSweep {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(300%);
-  }
-}
-
 /* Mobile responsive scaling */
 @media (max-width: 420px) {
   .loader-orbit-system {
@@ -359,8 +398,17 @@
 
   .shark-runner {
     top: 20px;
-    width: 38px;
-    height: 16px;
+    width: 46px;
+    height: 19px;
+  }
+
+  .shark-wake {
+    top: 20px;
+    left: 20px;
+    width: 92px;
+    height: 92px;
+    -webkit-mask: radial-gradient(circle, transparent 42.5px, #000 43.5px, #000 46px, transparent 46.5px);
+    mask: radial-gradient(circle, transparent 42.5px, #000 43.5px, #000 46px, transparent 46.5px);
   }
 
   .loader-wordmark {
@@ -378,20 +426,29 @@
     letter-spacing: 0.12em;
   }
 
-  .loader-shimmer-bar {
-    width: 110px;
-  }
 }
 
-/* Reduced Motion Fallback */
+/* Reduced Motion Fallback: calm static composition (shark parked on the orbit, wake visible) */
 @media (prefers-reduced-motion: reduce) {
+  .sauda-loader-wrapper {
+    animation: saudaLoaderReveal 1ms linear both;
+  }
+
   .shark-orbit-arm,
   .shark-body-flex,
   .water-ripple,
   .water-droplet,
-  .telemetry-indicator-dot,
-  .shimmer-progress-sweep {
+  .shark-bubble,
+  .telemetry-indicator-dot {
     animation: none !important;
+  }
+
+  .shark-orbit-arm {
+    transform: rotate(40deg);
+  }
+
+  .shark-bubble {
+    opacity: 0;
   }
 
   .water-ripple {
@@ -402,11 +459,5 @@
   .water-droplet {
     opacity: 0.5;
     transform: scale(1);
-  }
-
-  .shimmer-progress-sweep {
-    width: 100%;
-    background: #c3a064;
-    opacity: 0.6;
   }
 }

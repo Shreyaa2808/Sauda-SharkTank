@@ -221,7 +221,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
 
               <div className="brand-panel-footer">
-                <span>SHARK TANK INDIA DBMS // AUTHENTICATION</span>
+                <span>SAUDA // SECURE SIGN-IN</span>
               </div>
             </div>
           </aside>
@@ -359,10 +359,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 )}
               </div>
 
-              {/* Subdued Academic Disclaimer */}
+              {/* Sign-in note */}
               <div className="legal-disclaimer-container">
                 <p className="legal-disclaimer-text">
-                  Academic DBMS prototype based on the Shark Tank India domain.
+                  Sign in securely with your Google account.
                 </p>
               </div>
             </div>

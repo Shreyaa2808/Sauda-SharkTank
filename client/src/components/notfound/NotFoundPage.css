@@ -1,0 +1,240 @@
+/* ==========================================================================
+   Sauda — 404 page (sonar / orbit detail on the navy stage)
+   ========================================================================== */
+.nf-page {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: calc(100svh - 80px);
+  padding: clamp(32px, 6vw, 72px) clamp(20px, 6vw, 96px);
+  background:
+    radial-gradient(ellipse 60% 80% at 80% 40%, rgba(22, 141, 164, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 10% 0%, rgba(195, 160, 100, 0.1) 0%, transparent 62%),
+    linear-gradient(180deg, #0A1929 0%, #0C2037 100%);
+  color: #FFFFFF;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.nf-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 80% at 70% 40%, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 70% 40%, #000 0%, transparent 75%);
+  pointer-events: none;
+}
+
+.nf-inner {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: clamp(24px, 5vw, 64px);
+}
+
+.nf-visual svg {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
+  margin: 0 auto;
+  overflow: visible;
+}
+
+.nf-code {
+  font-family: var(--font-editorial, Georgia, serif);
+  font-size: 54px;
+  font-weight: 700;
+  fill: #FFFFFF;
+  letter-spacing: -1px;
+}
+
+.nf-orbit {
+  transform-origin: 160px 160px;
+  animation: nf-orbit 60s linear infinite;
+}
+
+.nf-sonar {
+  transform-origin: 160px 160px;
+  stroke-width: 1;
+  opacity: 0;
+  animation: nf-sonar 4.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+
+.nf-sonar-b {
+  animation-delay: 2.1s;
+}
+
+@keyframes nf-orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes nf-sonar {
+  0% { transform: scale(0.8); opacity: 0.7; }
+  100% { transform: scale(3.4); opacity: 0; }
+}
+
+.nf-copy {
+  min-width: 0;
+}
+
+.nf-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-light, #E0C797);
+}
+
+.nf-eyebrow-rule {
+  width: 28px;
+  height: 1px;
+  background: var(--gold-accent, #C3A064);
+  flex-shrink: 0;
+}
+
+.nf-title {
+  margin: 0;
+  color: #FFFFFF;
+  font-family: var(--font-editorial, Georgia, serif);
+  font-size: clamp(1.9rem, 1.2rem + 2.8vw, 3.2rem);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.nf-lede {
+  margin: 16px 0 0;
+  max-width: 48ch;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: #B7C6D4;
+}
+
+.nf-path {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 18px 0 0;
+  min-width: 0;
+}
+
+.nf-path-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7E93A5;
+}
+
+.nf-path code {
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--font-mono, monospace);
+  font-size: 12.5px;
+  color: #D5E0EA;
+  overflow-wrap: anywhere;
+}
+
+.nf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.nf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: var(--radius-sm, 6px);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.nf-btn:focus-visible {
+  outline: 2px solid var(--gold-light, #E0C797);
+  outline-offset: 3px;
+}
+
+.nf-btn-primary {
+  background: var(--gold-accent, #C3A064);
+  border: 1px solid var(--gold-accent, #C3A064);
+  color: #0A1929;
+}
+
+.nf-btn-primary:hover {
+  background: var(--gold-light, #E0C797);
+  border-color: var(--gold-light, #E0C797);
+}
+
+.nf-btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #E6EDF3;
+}
+
+.nf-btn-ghost:hover {
+  border-color: var(--gold-accent, #C3A064);
+  background: rgba(255, 255, 255, 0.05);
+  color: #FFFFFF;
+}
+
+@media (max-width: 760px) {
+  .nf-page {
+    min-height: calc(100svh - 68px);
+    align-items: flex-start;
+  }
+
+  .nf-inner {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .nf-visual svg {
+    width: min(70%, 220px);
+  }
+
+  .nf-copy {
+    text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .nf-actions .nf-btn {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nf-orbit {
+    animation: none;
+  }
+
+  .nf-sonar {
+    animation: none;
+    opacity: 0.25;
+    transform: scale(1.6);
+  }
+}
