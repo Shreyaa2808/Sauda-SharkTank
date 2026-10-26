@@ -141,6 +141,10 @@ async function runTests() {
   });
   assert(intruderFounderRes.status === 403, 'Intruder without FOUNDER role rejected (403)');
 
+  // A valid stage is required before a pitch can be submitted for review
+  const [stageRows] = await dbPool.execute<RowDataPacket[]>(`SELECT stage_id FROM startup_stage ORDER BY stage_id LIMIT 1`);
+  const testStageId = Number(stageRows[0]?.stage_id ?? 1);
+
   // Founder create pitch (DRAFT)
   const createDraftRes = await fetch(`${API_BASE}/founder/pitches`, {
     method: 'POST',
@@ -149,6 +153,7 @@ async function runTests() {
       brandName: 'Quantum Solar Tech',
       legalBusinessName: 'Quantum Solar Private Limited',
       industryId: 4, // Sustainable Packaging / Clean Energy
+      stageId: testStageId,
       pitchHook: 'Next-generation solid-state solar thermal cells with 42% efficiency.',
       businessModel: 'B2B Enterprise',
       originalAskAmount: 7500000, // 75 Lakhs

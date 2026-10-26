@@ -72,7 +72,6 @@ export const ComparisonMatrix: React.FC<ComparisonMatrixProps> = ({
       className="modal-backdrop matrix-backdrop"
       onClick={onClose}
       role="presentation"
-      aria-hidden="true"
     >
       <div
         role="dialog"

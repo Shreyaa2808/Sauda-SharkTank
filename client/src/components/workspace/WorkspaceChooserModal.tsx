@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { AuthUser } from '../../services/auth.ts';
 import { activateWorkspaceRole } from '../../services/workspace.ts';
 import './WorkspaceChooserModal.css';
@@ -20,6 +20,47 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
 }) => {
   const [activatingRole, setActivatingRole] = useState<'FOUNDER' | 'INVESTOR' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Escape closes; Tab is trapped inside the dialog; focus moves in on open and returns to the opener on close.
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    closeBtnRef.current?.focus();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusables || focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panelRef.current?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !panelRef.current?.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      opener?.focus?.();
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -45,12 +86,12 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
 
   return (
     <div className="workspace-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="workspace-modal-title">
-      <div className="workspace-modal-panel" onClick={(e) => e.stopPropagation()}>
+      <div ref={panelRef} className="workspace-modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="workspace-modal-header">
           <div className="workspace-brand-pill">
             <span className="gold-dot" /> SAUDA WORKSPACE REGISTRY
           </div>
-          <button className="workspace-close-btn" onClick={onClose} aria-label="Close workspace chooser">
+          <button ref={closeBtnRef} type="button" className="workspace-close-btn" onClick={onClose} aria-label="Close workspace chooser">
             ✕
           </button>
         </div>

@@ -349,7 +349,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   <div className="read-only-box">
                     <span className="box-role-badge">{primaryRole}</span>
                     <span className="box-role-desc">
-                      Default academic discovery role. Elevated roles (FOUNDER, INVESTOR, ADMIN) are
+                      Default discovery role. Elevated roles (FOUNDER, INVESTOR, ADMIN) are
                       assigned via database governance.
                     </span>
                   </div>

@@ -160,3 +160,8 @@ a:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/* Keep layout width constant when body scroll is locked (drawer open) so the header never shifts. */
+html {
+  scrollbar-gutter: stable;
+}

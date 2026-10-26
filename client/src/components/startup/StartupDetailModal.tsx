@@ -81,7 +81,6 @@ export const StartupDetailModal: React.FC<StartupDetailModalProps> = ({
       className="modal-backdrop"
       onClick={onClose}
       role="presentation"
-      aria-hidden="true"
     >
       <div
         ref={dialogRef}
