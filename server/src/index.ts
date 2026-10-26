@@ -18,9 +18,6 @@ import {
 } from './auth.js';
 import {
   getMetadata,
-  getFounderDashboard,
-  createFounderPitch,
-  updateFounderPitch,
   getInvestorDashboard,
   getInvestorPitches,
   toggleWatchlist,
@@ -31,6 +28,13 @@ import {
   getConversationMessages,
   sendChatMessage,
 } from './workspaces.js';
+import {
+  getFounderDashboard,
+  getFounderPitchById,
+  createFounderPitch,
+  updateFounderPitch,
+  archiveFounderPitch,
+} from './founder.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -433,6 +437,7 @@ app.post('/api/founder/pitches', async (req, res) => {
       res.status(result.status).json({
         error: result.error,
         message: result.message,
+        ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
       });
       return;
     }
@@ -476,6 +481,7 @@ app.put('/api/founder/pitches/:pitchId', async (req, res) => {
       res.status(result.status).json({
         error: result.error,
         message: result.message,
+        ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
       });
       return;
     }
@@ -491,6 +497,68 @@ app.put('/api/founder/pitches/:pitchId', async (req, res) => {
       error: 'SERVER_ERROR',
       message: 'Failed to update pitch.',
     });
+  }
+});
+
+/**
+ * GET /api/founder/pitches/:pitchId
+ * Returns one of the founder's own PLATFORM pitches (used to load the edit form).
+ * Requires FOUNDER role; owner only.
+ */
+app.get('/api/founder/pitches/:pitchId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['FOUNDER']);
+  if (!user) return;
+
+  const pitchId = Number(req.params.pitchId);
+  if (!Number.isInteger(pitchId) || pitchId < 1) {
+    res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' });
+    return;
+  }
+
+  try {
+    const result = await getFounderPitchById(user.userId, pitchId);
+    if (!result.success) {
+      res.status(result.status).json({ error: result.error, message: result.message });
+      return;
+    }
+    res.status(200).json({ ok: true, pitch: result.pitch });
+  } catch (err) {
+    console.error('Get founder pitch error:', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to load pitch.' });
+  }
+});
+
+/**
+ * POST /api/founder/pitches/:pitchId/archive
+ * Owner-only soft removal. Sets pitch_status = 'ARCHIVED', withdraws pending requests,
+ * ends accepted connections and makes their conversations read-only. Nothing is deleted.
+ * Requires FOUNDER role.
+ */
+app.post('/api/founder/pitches/:pitchId/archive', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['FOUNDER']);
+  if (!user) return;
+
+  const pitchId = Number(req.params.pitchId);
+  if (!Number.isInteger(pitchId) || pitchId < 1) {
+    res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' });
+    return;
+  }
+
+  try {
+    const result = await archiveFounderPitch(user.userId, pitchId);
+    if (!result.success) {
+      res.status(result.status).json({ error: result.error, message: result.message });
+      return;
+    }
+    res.status(200).json({
+      ok: true,
+      pitch: result.pitch,
+      summary: result.summary,
+      message: 'Pitch archived.',
+    });
+  } catch (err) {
+    console.error('Archive pitch error:', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to archive pitch.' });
   }
 });
 
