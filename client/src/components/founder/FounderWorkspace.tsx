@@ -257,7 +257,7 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
           </div>
           <h1 className="founder-title">Manage Your Ventures.</h1>
           <p className="founder-subtitle">
-            Draft, review, and register your platform startup listings. Verified pitches connect directly with accredited investors.
+            Build your venture profile, track each pitch’s status, and manage your listings from one workspace.
           </p>
         </div>
         <div className="founder-header-actions">
@@ -274,26 +274,26 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
 
       {/* KPI Stats Ribbon */}
       <div className="founder-kpi-ribbon">
-        <div className="founder-kpi-card" onClick={() => setFilterStatus('ALL')}>
+        <button type="button" className="founder-kpi-card" aria-pressed={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')}>
           <span className="kpi-label">Total Ventures</span>
           <span className="kpi-number">{metrics ? metrics.totalCount : '—'}</span>
-          <span className="kpi-sub">Registered platform listings</span>
-        </div>
-        <div className={`founder-kpi-card ${filterStatus === 'DRAFT' ? 'selected' : ''}`} onClick={() => setFilterStatus('DRAFT')}>
+          <span className="kpi-sub">Your venture listings</span>
+        </button>
+        <button type="button" className={`founder-kpi-card ${filterStatus === 'DRAFT' ? 'selected' : ''}`} aria-pressed={filterStatus === 'DRAFT'} onClick={() => setFilterStatus('DRAFT')}>
           <span className="kpi-label">Drafts in Progress</span>
           <span className="kpi-number amber">{metrics ? metrics.draftCount : '—'}</span>
-          <span className="kpi-sub">Private workspace drafts</span>
-        </div>
-        <div className={`founder-kpi-card ${filterStatus === 'SUBMITTED' ? 'selected' : ''}`} onClick={() => setFilterStatus('SUBMITTED')}>
+          <span className="kpi-sub">Saved, not yet submitted</span>
+        </button>
+        <button type="button" className={`founder-kpi-card ${filterStatus === 'SUBMITTED' ? 'selected' : ''}`} aria-pressed={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')}>
           <span className="kpi-label">Under Review</span>
           <span className="kpi-number blue">{metrics ? metrics.submittedCount : '—'}</span>
-          <span className="kpi-sub">Submitted for registry publish</span>
-        </div>
-        <div className={`founder-kpi-card ${filterStatus === 'PUBLISHED' ? 'selected' : ''}`} onClick={() => setFilterStatus('PUBLISHED')}>
+          <span className="kpi-sub">Awaiting a registry decision</span>
+        </button>
+        <button type="button" className={`founder-kpi-card ${filterStatus === 'PUBLISHED' ? 'selected' : ''}`} aria-pressed={filterStatus === 'PUBLISHED'} onClick={() => setFilterStatus('PUBLISHED')}>
           <span className="kpi-label">Live on Platform</span>
           <span className="kpi-number green">{metrics ? metrics.publishedCount : '—'}</span>
-          <span className="kpi-sub">Discoverable by investors</span>
-        </div>
+          <span className="kpi-sub">Visible in the registry</span>
+        </button>
       </div>
 
       {/* Filter Tabs */}

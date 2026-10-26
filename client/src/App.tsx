@@ -19,6 +19,7 @@ import { StartupDetailModal } from './components/startup/StartupDetailModal.tsx'
 import { ComparisonTray } from './components/compare/ComparisonTray.tsx';
 import { ComparisonMatrix } from './components/compare/ComparisonMatrix.tsx';
 import { DiscoveryHero } from './components/home/DiscoveryHero.tsx';
+import { ViewerDashboard } from './components/dashboard/ViewerDashboard.tsx';
 import { NotFoundPage } from './components/notfound/NotFoundPage.tsx';
 import { computeRegistryMetrics } from './utils/registryMetrics.ts';
 import { fetchStartups } from './services/api.ts';
@@ -32,7 +33,7 @@ import {
 } from './utils/formatters.ts';
 
 type FilterType = 'ALL' | PitchType;
-type KnownRoute = 'discovery' | 'login' | 'profile' | 'settings' | 'founder' | 'investor' | 'connections';
+type KnownRoute = 'discovery' | 'login' | 'dashboard' | 'profile' | 'settings' | 'founder' | 'investor' | 'connections';
 // 'notfound' is a real view for unrecognised URLs; it has no path of its own (the address bar keeps the requested URL).
 type AppRoute = KnownRoute | 'notfound';
 
@@ -44,6 +45,7 @@ const MIN_LOADER_MS = 1400;
 const ROUTE_PATHS: Record<KnownRoute, string> = {
   discovery: '/',
   login: '/login',
+  dashboard: '/dashboard',
   profile: '/profile',
   settings: '/settings',
   founder: '/founder',
@@ -52,18 +54,19 @@ const ROUTE_PATHS: Record<KnownRoute, string> = {
 };
 
 // Routes that need a server-verified session. Role checks for workspaces are layered on top.
-const AUTH_REQUIRED_ROUTES: AppRoute[] = ['profile', 'settings', 'founder', 'investor', 'connections'];
+const AUTH_REQUIRED_ROUTES: AppRoute[] = ['dashboard', 'profile', 'settings', 'founder', 'investor', 'connections'];
 const ROUTE_LABELS: Record<AppRoute, string> = {
   notfound: 'Page Not Found',
   discovery: 'Startup Discovery',
   login: 'Sign In',
+  dashboard: 'Dashboard',
   profile: 'Profile',
   settings: 'Account Settings',
   founder: 'Founder Workspace',
   investor: 'Investor Deal Room',
   connections: 'Connections',
 };
-const WORKSPACE_ROUTES: AppRoute[] = ['founder', 'investor', 'connections'];
+const WORKSPACE_ROUTES: AppRoute[] = ['dashboard', 'founder', 'investor', 'connections'];
 
 const pathToRoute = (rawPath: string): AppRoute => {
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
@@ -500,6 +503,7 @@ export const App: React.FC = () => {
               <button type="button" onClick={() => { setFilter('ALL'); scrollToExplorer(); }}>Venture Registry</button>
               <button type="button" onClick={() => { setSearch(''); setFilter('SHOW'); scrollToExplorer(); }}>Shark Tank Archive</button>
               <button type="button" onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>About</button>
+              {currentUser && <button type="button" onClick={() => navigateTo('dashboard')}>Dashboard</button>}
             </nav>
             <form
               className="topbar-search"
@@ -523,6 +527,7 @@ export const App: React.FC = () => {
           {currentUser ? (
             <AccountMenu
               user={currentUser}
+              currentRoute={currentRoute}
               onNavigate={(route) => navigateTo(route)}
               onOpenWorkspaces={() => setIsWorkspaceModalOpen(true)}
               onLogout={handleLogout}
@@ -573,6 +578,27 @@ export const App: React.FC = () => {
           currentUser={currentUser}
           onNavigate={navigateTo}
           onSignOut={handleLogout}
+        />
+      )}
+
+      {isInitialAuthDone && currentRoute === 'dashboard' && currentUser && (
+        <ViewerDashboard
+          currentUser={currentUser}
+          startups={startups}
+          loading={loading}
+          hasError={Boolean(error)}
+          metrics={metrics}
+          isCapped={isRegistryCapped}
+          hasFounder={hasRole('FOUNDER')}
+          hasInvestor={hasRole('INVESTOR')}
+          onSelectStartup={(startup) => {
+            setSelectedDetailStartup(startup);
+            navigateTo('discovery');
+          }}
+          onNavigateToDiscovery={() => navigateTo('discovery')}
+          onOpenWorkspaces={() => setIsWorkspaceModalOpen(true)}
+          onNavigateToFounder={() => navigateTo('founder')}
+          onNavigateToInvestor={() => navigateTo('investor')}
         />
       )}
 
@@ -639,6 +665,7 @@ export const App: React.FC = () => {
       {isWorkspaceModalOpen && (
         <WorkspaceChooserModal
           currentUser={currentUser}
+          currentRoute={currentRoute}
           isOpen={isWorkspaceModalOpen}
           onClose={() => setIsWorkspaceModalOpen(false)}
           onSelectWorkspace={(workspace) => {

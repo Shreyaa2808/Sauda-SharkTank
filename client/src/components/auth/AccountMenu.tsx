@@ -4,13 +4,16 @@ import type { AuthUser } from '../../services/auth.ts';
 
 interface AccountMenuProps {
   user: AuthUser;
-  onNavigate: (route: 'profile' | 'settings' | 'founder' | 'investor' | 'connections' | 'discovery') => void;
+  /** Current app route is used to show the workspace currently in use. */
+  currentRoute: string;
+  onNavigate: (route: 'profile' | 'settings' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'discovery') => void;
   onOpenWorkspaces: () => void;
   onLogout: () => void;
 }
 
 export const AccountMenu: React.FC<AccountMenuProps> = ({
   user,
+  currentRoute,
   onNavigate,
   onOpenWorkspaces,
   onLogout,
@@ -68,7 +71,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   }, [isOpen]);
 
   const handleSelectRoute = (
-    route: 'profile' | 'settings' | 'founder' | 'investor' | 'connections' | 'discovery',
+    route: 'profile' | 'settings' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'discovery',
   ) => {
     setIsOpen(false);
     onNavigate(route);
@@ -81,6 +84,13 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
   const initial = user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U';
   const primaryRole = user.roles && user.roles.length > 0 ? user.roles[0] : 'VIEWER';
+  const activeWorkspaceRole = currentRoute === 'founder' && user.roles.includes('FOUNDER')
+    ? 'FOUNDER'
+    : currentRoute === 'investor' && user.roles.includes('INVESTOR')
+      ? 'INVESTOR'
+      : currentRoute === 'dashboard'
+        ? 'VIEWER'
+        : primaryRole;
   const roleLabel = user.roles && user.roles.length > 0 ? user.roles.join(' · ') : 'VIEWER';
   const hasFounder = user.roles && user.roles.includes('FOUNDER');
   const hasInvestor = user.roles && user.roles.includes('INVESTOR');
@@ -97,13 +107,13 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls="account-menu-dropdown"
-        aria-label={`Account menu for ${user.fullName}`}
+        aria-label={`Account menu for ${user.fullName}; current workspace ${activeWorkspaceRole}`}
       >
         <span className="account-trigger-avatar" aria-hidden="true">
           {initial}
         </span>
         <span className="account-trigger-name">{user.fullName}</span>
-        <span className="account-trigger-role">{primaryRole}</span>
+        <span className="account-trigger-role">{activeWorkspaceRole}</span>
         <svg
           className={`account-trigger-chevron ${isOpen ? 'rotate' : ''}`}
           viewBox="0 0 12 12"
@@ -149,6 +159,26 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
           {/* Navigation Actions */}
           <div className="account-dropdown-items">
+            <button
+              type="button"
+              role="menuitem"
+              className="account-menu-item"
+              onClick={() => handleSelectRoute('dashboard')}
+            >
+              <div className="menu-item-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                  <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                  <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                  <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                  <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                </svg>
+              </div>
+              <div className="menu-item-labels">
+                <span className="menu-item-title">Dashboard</span>
+                <span className="menu-item-sub">Your Sauda overview</span>
+              </div>
+            </button>
+
             {/* Workspace Chooser Trigger */}
             <button
               type="button"

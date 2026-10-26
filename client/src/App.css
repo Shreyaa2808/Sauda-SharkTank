@@ -3039,3 +3039,42 @@
     transition: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Homepage topbar fit: prevent the full nav from colliding with the brand.
+   The Dashboard entry remains available in the account menu and navigation drawer.
+   -------------------------------------------------------------------------- */
+.topbar--home .topbar-left,
+.topbar--home .brand,
+.topbar--home .topbar-right {
+  flex-shrink: 0;
+}
+
+.topbar--home .brand {
+  min-width: max-content;
+}
+
+@media (max-width: 1680px) {
+  .topbar--home {
+    padding-inline: clamp(20px, 3.2vw, 52px);
+    gap: clamp(10px, 1.2vw, 18px);
+  }
+
+  .topbar--home .topbar-left {
+    gap: clamp(8px, 1vw, 14px);
+  }
+
+  .topbar--home .topbar-links {
+    display: none;
+  }
+
+  .topbar--home .topbar-search {
+    width: clamp(160px, 18vw, 250px);
+    flex: 0 1 250px;
+    margin-left: auto;
+  }
+
+  .topbar--home .topbar-right {
+    gap: 10px;
+  }
+}
