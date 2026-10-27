@@ -371,11 +371,6 @@
   color: #071C33;
 }
 
-.party-email {
-  font-size: 0.82rem;
-  color: #0284c7;
-}
-
 .party-firm {
   font-size: 0.78rem;
   color: #64748b;
@@ -739,4 +734,10 @@
   .connections-detail-pane {
     min-height: 500px;
   }
+}
+
+/* Keyboard focus for selectable connection list items */
+.conn-list-item:focus-visible {
+  outline: 3px solid #0284c7;
+  outline-offset: 2px;
 }

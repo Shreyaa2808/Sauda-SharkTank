@@ -15,6 +15,7 @@ import {
   getUserProfile,
   updateUserProfile,
   activateUserRole,
+  assertSessionSecretConfigured,
 } from './auth.js';
 import {
   getMetadata,
@@ -36,12 +37,21 @@ import {
   archiveFounderPitch,
 } from './founder.js';
 
+// Fail closed: refuse to boot without a strong, non-placeholder AUTH_SESSION_SECRET.
+try {
+  assertSessionSecretConfigured();
+} catch (err) {
+  console.error(`[FATAL] ${(err as Error).message}`);
+  process.exit(1);
+}
+
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
 app.use(helmet());
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
-app.use(express.json());
+// Bound request bodies; oversized payloads are rejected with 413 (see error handler below).
+app.use(express.json({ limit: '100kb' }));
 
 // ============================================================================
 // HEALTH ENDPOINTS
@@ -635,7 +645,7 @@ app.post('/api/investor/watchlist/toggle', async (req, res) => {
   const user = await requireAuthAndRole(req, res, ['INVESTOR']);
   if (!user) return;
 
-  const pitchId = Number(req.body.pitchId);
+  const pitchId = Number(req.body?.pitchId);
   if (!Number.isInteger(pitchId) || pitchId < 1) {
     res.status(400).json({
       error: 'INVALID_PITCH_ID',
@@ -683,7 +693,7 @@ app.post('/api/connections/request', async (req, res) => {
   }
 
   try {
-    const result = await createConnectionRequest(user.userId, pitchId, req.body.initialMessage);
+    const result = await createConnectionRequest(user.userId, pitchId, req.body?.initialMessage);
     if (!result.success) {
       res.status(result.status).json({
         error: result.error,
@@ -850,15 +860,17 @@ app.post('/api/conversations/:conversationId/messages', async (req, res) => {
   if (!user) return;
 
   const conversationId = Number(req.params.conversationId);
-  const { messageBody } = req.body;
+  const messageBody: unknown = req.body?.messageBody;
 
-  if (typeof messageBody !== 'string' || !messageBody.trim()) {
+  if (!Number.isInteger(conversationId) || conversationId < 1) {
     res.status(400).json({
-      error: 'INVALID_MESSAGE',
-      message: 'Message body cannot be empty.',
+      error: 'INVALID_CONVERSATION_ID',
+      message: 'Valid conversation ID required.',
     });
     return;
   }
+
+  // Type, emptiness and length bounds are enforced in sendChatMessage (400 on violation).
 
   try {
     const result = await sendChatMessage(user.userId, conversationId, messageBody);
@@ -951,6 +963,24 @@ app.get('/api/startups', async (req, res) => {
       error: 'Unable to fetch startups'
     });
   }
+});
+
+// Centralised error handler: malformed / oversized JSON bodies return clear 4xx responses.
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  if (err?.type === 'entity.too.large') {
+    res.status(413).json({ error: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large.' });
+    return;
+  }
+  if (err?.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'INVALID_JSON', message: 'Request body is not valid JSON.' });
+    return;
+  }
+  console.error('Unhandled request error:', err?.message ?? err);
+  res.status(500).json({ error: 'SERVER_ERROR', message: 'Unexpected server error.' });
 });
 
 app.listen(PORT, async () => {

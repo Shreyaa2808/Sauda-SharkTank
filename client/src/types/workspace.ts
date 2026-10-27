@@ -114,11 +114,9 @@ export interface ConnectionRequestItem {
   industryName: string | null;
   investorUserId: number;
   investorName: string;
-  investorEmail: string;
   investorFirmName: string | null;
   founderUserId: number;
   founderName: string;
-  founderEmail: string;
   requestStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN' | 'ENDED';
   initialMessage: string | null;
   statusReason: string | null;
@@ -148,7 +146,6 @@ export interface ConversationDetail {
   brandName: string;
   counterpartUserId: number;
   counterpartName: string;
-  counterpartEmail: string;
   counterpartRole: 'FOUNDER' | 'INVESTOR';
   messages: ChatMessageItem[];
 }

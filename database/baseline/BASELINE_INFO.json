@@ -1,0 +1,5 @@
+{
+  "source": "mysqldump --no-data of sharktank_db_test_full_20261023 (MySQL 8.0.46), completed 2026-10-27 14:08:52",
+  "includesMigrations": ["001"],
+  "evidence": "Every table, column, key and constraint created by 001 is present in the export (verified object-by-object by server/scripts/db/baseline.test.ts). 002 is NOT present (pitch has no updated_at/review_note). 003 is superseded: user_saved_pitch already existed in the original schema. This file only describes the BASELINE FILES; it says nothing about the application database sharktank_db."
+}

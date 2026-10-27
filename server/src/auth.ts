@@ -28,11 +28,59 @@ export interface GoogleVerifiedProfile {
   picture?: string;
 }
 
+const MIN_SESSION_SECRET_LENGTH = 32;
+const PLACEHOLDER_SECRET_PATTERNS = [
+  'your-',
+  'your_',
+  'change',
+  'placeholder',
+  'example',
+  'secret-min',
+  'sauda_dev_session',
+  'replace',
+  'password',
+  'default',
+];
+
 /**
- * Get secret for signing session cookies.
+ * Returns a human-readable problem with the configured secret, or null if it is acceptable.
+ * The message never contains the secret itself.
+ */
+function describeSecretProblem(secret: string | undefined): string | null {
+  if (!secret || !secret.trim()) return 'AUTH_SESSION_SECRET is not set.';
+  if (secret.length < MIN_SESSION_SECRET_LENGTH) {
+    return `AUTH_SESSION_SECRET is too short (${secret.length} characters; at least ${MIN_SESSION_SECRET_LENGTH} required).`;
+  }
+  const lower = secret.toLowerCase();
+  if (PLACEHOLDER_SECRET_PATTERNS.some((p) => lower.includes(p))) {
+    return 'AUTH_SESSION_SECRET looks like a placeholder or example value.';
+  }
+  if (new Set(secret).size < 10) {
+    return 'AUTH_SESSION_SECRET has too little variety to be a random secret.';
+  }
+  return null;
+}
+
+/**
+ * Validates AUTH_SESSION_SECRET and throws an actionable error (without printing the secret).
+ * Called at server startup so the API fails closed instead of signing with a weak/known key.
+ */
+export function assertSessionSecretConfigured(): void {
+  const problem = describeSecretProblem(process.env.AUTH_SESSION_SECRET);
+  if (problem) {
+    throw new Error(
+      `${problem} Set a unique random value in server/.env, e.g. ` +
+        `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`,
+    );
+  }
+}
+
+/**
+ * Get secret for signing session cookies. Never falls back to a built-in default.
  */
 function getSessionSecret(): string {
-  return process.env.AUTH_SESSION_SECRET || 'sauda_dev_session_secret_change_in_production_min_32';
+  assertSessionSecretConfigured();
+  return process.env.AUTH_SESSION_SECRET as string;
 }
 
 /**
@@ -341,6 +389,22 @@ export async function authenticateOrProvisionGoogleUser(
   try {
     await conn.beginTransaction();
 
+    // Look up role_id for VIEWER by name first; there is no numeric fallback.
+    const [viewerRoleRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT role_id AS roleId FROM app_role WHERE role_name = 'VIEWER'`,
+    );
+    const viewerRoleId = Number(viewerRoleRows[0]?.roleId);
+    if (!Number.isInteger(viewerRoleId) || viewerRoleId < 1) {
+      await conn.rollback();
+      console.error('Account provisioning aborted: app_role has no valid VIEWER role. Seed the role table.');
+      return {
+        success: false,
+        status: 500,
+        error: 'SERVER_CONFIGURATION_ERROR',
+        message: 'Account creation is temporarily unavailable due to a server configuration problem.',
+      };
+    }
+
     const fullName = profile.name || profile.email.split('@')[0];
 
     const [insertResult] = await conn.execute<ResultSetHeader>(
@@ -350,13 +414,6 @@ export async function authenticateOrProvisionGoogleUser(
     );
 
     const newUserId = insertResult.insertId;
-
-    // Look up role_id for VIEWER
-    const [viewerRoleRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT role_id AS roleId FROM app_role WHERE role_name = 'VIEWER'`,
-    );
-
-    const viewerRoleId = viewerRoleRows[0]?.roleId || 1;
 
     // Assign default VIEWER role (normal users never assign themselves ADMIN, FOUNDER, or INVESTOR during Google auth)
     await conn.execute(

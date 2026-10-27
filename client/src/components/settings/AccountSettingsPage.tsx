@@ -211,12 +211,12 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({
 
                 <div className="settings-field">
                   <span className="field-name">Client JavaScript Access</span>
-                  <span className="field-value text-safe">Restricted (XSS Immune)</span>
+                  <span className="field-value text-safe">Cookie not readable by page scripts (HttpOnly)</span>
                 </div>
 
                 <div className="settings-field">
                   <span className="field-name">Session Duration</span>
-                  <span className="field-value">7 Days (Rolling Expiration)</span>
+                  <span className="field-value">7 Days (fixed from sign-in)</span>
                 </div>
               </div>
             </section>
@@ -256,7 +256,7 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({
                     <span className="perm-icon">✓</span>
                     <div className="perm-text">
                       <strong>Dual-Source Startup Discovery</strong>
-                      <span>Search, filter, and inspect verified Shark Tank show pitches and platform listings.</span>
+                      <span>Search, filter, and inspect Shark Tank show pitches and platform listings.</span>
                     </div>
                   </div>
 
@@ -272,7 +272,7 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({
                     <span className="perm-icon">🔒</span>
                     <div className="perm-text">
                       <strong>Venture Registration & Cap-Table Management</strong>
-                      <span>Restricted to verified founders with active <code>FOUNDER</code> credentials.</span>
+                      <span>Restricted to accounts that have the <code>FOUNDER</code> role.</span>
                     </div>
                   </div>
 
@@ -280,7 +280,7 @@ export const AccountSettingsPage: React.FC<AccountSettingsPageProps> = ({
                     <span className="perm-icon">🔒</span>
                     <div className="perm-text">
                       <strong>Deal Syndication & Term Sheet Structuring</strong>
-                      <span>Restricted to accredited venture funds with active <code>INVESTOR</code> credentials.</span>
+                      <span>Restricted to accounts that have the <code>INVESTOR</code> role.</span>
                     </div>
                   </div>
                 </div>

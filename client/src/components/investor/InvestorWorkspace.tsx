@@ -513,7 +513,7 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
             </div>
 
             <p className="connect-modal-desc">
-              Send a verified connection proposal to <strong>{connectPitch.founderName || 'Founder'}</strong> for{' '}
+              Send a connection proposal to <strong>{connectPitch.founderName || 'Founder'}</strong> for{' '}
               <strong>{connectPitch.brandName}</strong>. If accepted, a private conversation thread will be opened.
             </p>
 

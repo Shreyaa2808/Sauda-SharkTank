@@ -8,7 +8,11 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
+    "db:migrate": "tsx scripts/db/migrate.ts",
+    "db:test:create": "tsx scripts/db/create_test_db.ts",
+    "test:dbtools": "tsx --test scripts/db/lib.test.ts scripts/db/baseline.test.ts"
   },
   "keywords": [],
   "author": "",

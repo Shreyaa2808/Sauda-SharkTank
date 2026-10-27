@@ -1,6 +1,46 @@
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { dbPool } from './db.js';
 
+// Input bounds (kept in sync with the client-side maxLength on the same fields).
+export const MAX_INTRO_MESSAGE_LENGTH = 1000;
+export const MAX_CHAT_MESSAGE_LENGTH = 2000;
+
+type BoundedTextResult =
+  | { ok: true; value: string | null }
+  | { ok: false; error: string; message: string };
+
+/**
+ * Validates optional/required free-text input: must be a string, non-blank when required,
+ * and no longer than maxLength (after trimming).
+ */
+function validateBoundedText(
+  input: unknown,
+  opts: { required: boolean; maxLength: number; label: string; emptyError: string },
+): BoundedTextResult {
+  if (input === undefined || input === null) {
+    return opts.required
+      ? { ok: false, error: opts.emptyError, message: `${opts.label} cannot be empty.` }
+      : { ok: true, value: null };
+  }
+  if (typeof input !== 'string') {
+    return { ok: false, error: 'INVALID_MESSAGE', message: `${opts.label} must be text.` };
+  }
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return opts.required
+      ? { ok: false, error: opts.emptyError, message: `${opts.label} cannot be empty.` }
+      : { ok: true, value: null };
+  }
+  if (trimmed.length > opts.maxLength) {
+    return {
+      ok: false,
+      error: 'MESSAGE_TOO_LONG',
+      message: `${opts.label} must be ${opts.maxLength} characters or fewer.`,
+    };
+  }
+  return { ok: true, value: trimmed };
+}
+
 // ============================================================================
 // METADATA (INDUSTRIES & STAGES)
 // ============================================================================
@@ -264,11 +304,9 @@ export interface ConnectionRequestItem {
   industryName: string | null;
   investorUserId: number;
   investorName: string;
-  investorEmail: string;
   investorFirmName: string | null;
   founderUserId: number;
   founderName: string;
-  founderEmail: string;
   requestStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN' | 'ENDED';
   initialMessage: string | null;
   statusReason: string | null;
@@ -282,8 +320,19 @@ export interface ConnectionRequestItem {
 export async function createConnectionRequest(
   investorUserId: number,
   pitchId: number,
-  initialMessage?: string,
+  initialMessage?: unknown,
 ): Promise<{ success: true; requestId: number; request: ConnectionRequestItem } | { success: false; status: number; error: string; message: string }> {
+  // 0. Validate introduction message bounds before touching the database
+  const introCheck = validateBoundedText(initialMessage, {
+    required: false,
+    maxLength: MAX_INTRO_MESSAGE_LENGTH,
+    label: 'Introduction message',
+    emptyError: 'INVALID_MESSAGE',
+  });
+  if (!introCheck.ok) {
+    return { success: false, status: 400, error: introCheck.error, message: introCheck.message };
+  }
+
   // 1. Verify pitch existence and publication
   const [pitchRows] = await dbPool.execute<RowDataPacket[]>(
     `SELECT p.pitch_id, p.pitch_type, p.pitch_status, p.submitted_by_user_id, c.brand_name
@@ -395,7 +444,7 @@ export async function createConnectionRequest(
       };
     }
 
-    const cleanMessage = initialMessage?.trim() || null;
+    const cleanMessage = introCheck.value;
 
     // Insert connection request
     const [insertResult] = await conn.execute<ResultSetHeader>(
@@ -447,11 +496,9 @@ export async function getConnectionRequestById(requestId: number): Promise<Conne
        i.industry_name AS industryName,
        cr.investor_user_id AS investorUserId,
        iu.full_name AS investorName,
-       iu.email AS investorEmail,
        inv.investment_firm_name AS investorFirmName,
        cr.founder_user_id AS founderUserId,
        fu.full_name AS founderName,
-       fu.email AS founderEmail,
        cr.request_status AS requestStatus,
        cr.initial_message AS initialMessage,
        cr.status_reason AS statusReason,
@@ -490,11 +537,9 @@ export async function getUserConnections(userId: number): Promise<{
        i.industry_name AS industryName,
        cr.investor_user_id AS investorUserId,
        iu.full_name AS investorName,
-       iu.email AS investorEmail,
        inv.investment_firm_name AS investorFirmName,
        cr.founder_user_id AS founderUserId,
        fu.full_name AS founderName,
-       fu.email AS founderEmail,
        cr.request_status AS requestStatus,
        cr.initial_message AS initialMessage,
        cr.status_reason AS statusReason,
@@ -721,7 +766,6 @@ export interface ConversationDetail {
   brandName: string;
   counterpartUserId: number;
   counterpartName: string;
-  counterpartEmail: string;
   counterpartRole: 'FOUNDER' | 'INVESTOR';
   messages: ChatMessageItem[];
 }
@@ -741,10 +785,8 @@ export async function getConversationMessages(
        comp.brand_name AS brandName,
        cr.investor_user_id AS investorUserId,
        iu.full_name AS investorName,
-       iu.email AS investorEmail,
        cr.founder_user_id AS founderUserId,
-       fu.full_name AS founderName,
-       fu.email AS founderEmail
+       fu.full_name AS founderName
      FROM conversation c
      INNER JOIN connection_request cr ON cr.request_id = c.request_id
      INNER JOIN pitch p ON p.pitch_id = cr.pitch_id
@@ -796,7 +838,6 @@ export async function getConversationMessages(
 
   const counterpartUserId = isInvestor ? row.founderUserId : row.investorUserId;
   const counterpartName = isInvestor ? row.founderName : row.investorName;
-  const counterpartEmail = isInvestor ? row.founderEmail : row.investorEmail;
   const counterpartRole: 'FOUNDER' | 'INVESTOR' = isInvestor ? 'FOUNDER' : 'INVESTOR';
 
   return {
@@ -810,7 +851,6 @@ export async function getConversationMessages(
       brandName: row.brandName,
       counterpartUserId,
       counterpartName,
-      counterpartEmail,
       counterpartRole,
       messages: messageRows as ChatMessageItem[],
     },
@@ -820,17 +860,23 @@ export async function getConversationMessages(
 export async function sendChatMessage(
   userId: number,
   conversationId: number,
-  messageBody: string,
+  messageBody: unknown,
 ): Promise<{ success: true; message: ChatMessageItem } | { success: false; status: number; error: string; message: string }> {
-  const trimmed = (messageBody || '').trim();
-  if (!trimmed) {
+  const bodyCheck = validateBoundedText(messageBody, {
+    required: true,
+    maxLength: MAX_CHAT_MESSAGE_LENGTH,
+    label: 'Message body',
+    emptyError: 'EMPTY_MESSAGE',
+  });
+  if (!bodyCheck.ok || bodyCheck.value === null) {
     return {
       success: false,
       status: 400,
-      error: 'EMPTY_MESSAGE',
-      message: 'Message body cannot be empty.',
+      error: bodyCheck.ok ? 'EMPTY_MESSAGE' : bodyCheck.error,
+      message: bodyCheck.ok ? 'Message body cannot be empty.' : bodyCheck.message,
     };
   }
+  const trimmed = bodyCheck.value;
 
   // Lookup conversation and verify participant authorization
   const [convRows] = await dbPool.execute<RowDataPacket[]>(

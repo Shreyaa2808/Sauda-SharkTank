@@ -1,0 +1,25 @@
+-- ============================================================================
+-- STATUS: SUPERSEDED. NOTHING IN THIS FILE IS EXECUTABLE. DO NOT RESTORE THE OLD DDL.
+--
+-- The Phase 2 (first pass) draft assumed `user_saved_pitch` was missing from the database.
+-- The 2026-10-27 schema-only export proves it already exists, from the original 38-table schema:
+--
+--   user_saved_pitch (
+--     user_id    bigint    NOT NULL,
+--     pitch_id   bigint    NOT NULL,
+--     saved_at   timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--     private_notes text   NULL,                       -- not used by the application
+--     PRIMARY KEY (user_id, pitch_id),
+--     KEY pitch_id (pitch_id),
+--     FK user_id  -> app_user(user_id)   (NO ACTION),
+--     FK pitch_id -> pitch(pitch_id)     (NO ACTION))
+--
+-- The old draft would have failed ("table already exists") and, had it succeeded, would have
+-- created a different table (no private_notes, ON DELETE CASCADE). The real definition is
+-- captured in database/baseline/001_baseline_schema.sql. This migration number is recorded in
+-- database/migrations/superseded.json and the runner skips it.
+--
+-- If a database is found that genuinely lacks user_saved_pitch (check with
+-- database/preflight/phase2_readonly_schema_inspection.sql, section 8), create it from the
+-- baseline definition above rather than from a new guess.
+-- ============================================================================
