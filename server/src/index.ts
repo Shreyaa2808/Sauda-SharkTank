@@ -36,6 +36,15 @@ import {
   updateFounderPitch,
   archiveFounderPitch,
 } from './founder.js';
+import {
+  AdminReviewError,
+  decideAdminReview,
+  evaluateRoleAccess,
+  getAdminReviewDetail,
+  getAdminReviewQueue,
+  getFounderPitchReviewHistory,
+  parseReviewDecisionInput,
+} from './adminReview.js';
 
 // Fail closed: refuse to boot without a strong, non-placeholder AUTH_SESSION_SECRET.
 try {
@@ -307,8 +316,10 @@ async function requireAuthAndRole(
 ) {
   const session = getSessionFromRequest(req);
   if (!session) {
-    res.status(401).json({
-      error: 'UNAUTHORIZED',
+    // Keep the status decision shared with the role tests; no unauthenticated request is authorized.
+    const access = evaluateRoleAccess(false, [], allowedRoles);
+    res.status(access.status ?? 401).json({
+      error: access.error ?? 'UNAUTHORIZED',
       message: 'Authentication session required.',
     });
     return null;
@@ -324,15 +335,13 @@ async function requireAuthAndRole(
     return null;
   }
 
-  if (allowedRoles && allowedRoles.length > 0) {
-    const hasRole = allowedRoles.some((r) => user.roles.includes(r));
-    if (!hasRole) {
-      res.status(403).json({
-        error: 'FORBIDDEN',
-        message: `This action requires one of the following workspace roles: ${allowedRoles.join(', ')}.`,
-      });
-      return null;
-    }
+  const access = evaluateRoleAccess(true, user.roles, allowedRoles);
+  if (!access.allowed) {
+    res.status(access.status ?? 403).json({
+      error: access.error ?? 'FORBIDDEN',
+      message: `This action requires one of the following workspace roles: ${(allowedRoles ?? []).join(', ')}.`,
+    });
+    return null;
   }
 
   return user;
@@ -381,6 +390,94 @@ app.post('/api/user/roles/activate', async (req, res) => {
       error: 'SERVER_ERROR',
       message: 'Failed to activate workspace role.',
     });
+  }
+});
+
+// ============================================================================
+// ADMIN PITCH REVIEW ENDPOINTS
+// ============================================================================
+
+function sendReviewError(res: express.Response, error: unknown, fallbackMessage: string) {
+  if (error instanceof AdminReviewError) {
+    res.status(error.status).json({ error: error.code, message: error.message });
+    return;
+  }
+  console.error(fallbackMessage, error);
+  res.status(500).json({
+    error: 'SERVER_ERROR',
+    message: fallbackMessage,
+  });
+}
+
+/** GET /api/admin/reviews — eligible submitted PLATFORM pitches only. */
+app.get('/api/admin/reviews', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']);
+  if (!user) return;
+  try {
+    const data = await getAdminReviewQueue(dbPool);
+    res.status(200).json({ ok: true, data });
+  } catch (error) {
+    sendReviewError(res, error, 'Failed to load the Admin review queue.');
+  }
+});
+
+/** GET /api/admin/reviews/:pitchId — details and append-only review history for a PLATFORM pitch. */
+app.get('/api/admin/reviews/:pitchId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']);
+  if (!user) return;
+  const pitchId = Number(req.params.pitchId);
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
+    res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' });
+    return;
+  }
+  try {
+    const detail = await getAdminReviewDetail(dbPool, pitchId);
+    res.status(200).json({ ok: true, ...detail });
+  } catch (error) {
+    sendReviewError(res, error, 'Failed to load pitch review details.');
+  }
+});
+
+/** POST /api/admin/reviews/:pitchId/decision — serialize decisions under a row lock. */
+app.post('/api/admin/reviews/:pitchId/decision', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']);
+  if (!user) return;
+  const pitchId = Number(req.params.pitchId);
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
+    res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' });
+    return;
+  }
+  const parsed = parseReviewDecisionInput(req.body);
+  if (!parsed.ok) {
+    res.status(parsed.status).json({ error: parsed.error, message: parsed.message });
+    return;
+  }
+  try {
+    const result = await decideAdminReview(dbPool, pitchId, user.userId, parsed.value);
+    res.status(200).json({
+      ok: true,
+      ...result,
+      message: result.pitchStatus === 'PUBLISHED' ? 'Pitch published to the registry.' : 'Pitch rejected and feedback recorded.',
+    });
+  } catch (error) {
+    sendReviewError(res, error, 'Failed to save the pitch review decision. Ensure the approved review migration is applied.');
+  }
+});
+
+/** GET /api/founder/pitches/:pitchId/reviews — owner-only feedback/history. */
+app.get('/api/founder/pitches/:pitchId/reviews', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['FOUNDER']);
+  if (!user) return;
+  const pitchId = Number(req.params.pitchId);
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
+    res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' });
+    return;
+  }
+  try {
+    const history = await getFounderPitchReviewHistory(dbPool, user.userId, pitchId);
+    res.status(200).json({ ok: true, history });
+  } catch (error) {
+    sendReviewError(res, error, 'Failed to load pitch review feedback. Ensure the approved review migration is applied.');
   }
 });
 

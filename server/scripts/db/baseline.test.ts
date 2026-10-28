@@ -1,16 +1,24 @@
 /**
  * Static checks only: reads files, never connects to a database.
- * Verifies the baseline against the schema export's conclusions, migrations 001-003 and the backend SQL.
+ * Verifies the baseline against the schema export's conclusions, migrations 001-004 and the backend SQL.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadMigrations, planBaselineMarks, planMigrations } from './lib.js';
+import { assertMigrationCanBeMarked, loadMigrations, planBaselineMarks, planMigrations } from './lib.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const read = (p: string) => fs.readFileSync(path.join(root, p), 'utf8');
+
+function sourceFilesUnder(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return sourceFilesUnder(full);
+    return /\.(?:ts|tsx|js|jsx)$/.test(entry.name) ? [full] : [];
+  });
+}
 
 const stripSqlComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*--.*$/gm, '');
 
@@ -83,14 +91,35 @@ test('migration 001 is represented in the baseline (names and key types)', () =>
   assert.match(au.body, /`google_subject` varchar\(255\) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL/);
 });
 
-test('migration 002 is NOT represented (stays a pending draft)', () => {
+test('migration 002 is superseded: its pitch columns have no runtime consumer and 004 owns review history', () => {
   const pitch = baseline.get('pitch')!;
   assert.equal(pitch.columns.has('updated_at'), false);
   assert.equal(pitch.columns.has('review_note'), false);
-  const files = loadMigrations(path.join(root, 'database/migrations'));
+
+  const migrationsDir = path.join(root, 'database/migrations');
+  const files = loadMigrations(migrationsDir);
   const m002 = files.find((f) => f.version === '002')!;
+  const m004 = files.find((f) => f.version === '004')!;
   assert.equal(m002.isDraft, true);
+  assert.ok(m002.superseded, '002 must be explicitly superseded in metadata');
+  assert.throws(() => assertMigrationCanBeMarked(m002), /superseded and cannot be marked applied/);
   assert.match(m002.sql, /ADD COLUMN updated_at/);
+  assert.match(m002.sql, /ADD COLUMN review_note/);
+  assert.equal(m004.isDraft, true, '004 stays DRAFT until explicitly reviewed');
+  assert.match(m004.sql, /CREATE TABLE pitch_review_event/);
+
+  // Review-note runtime usage is tied to pitch_review_event, not pitch.review_note.
+  const runtimeFiles = [
+    ...sourceFilesUnder(path.join(root, 'server/src')),
+    ...sourceFilesUnder(path.join(root, 'client/src')),
+  ].filter((file) => !path.basename(file).startsWith('test_'));
+  const allRuntime = runtimeFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+  assert.doesNotMatch(allRuntime, /\b(?:pitch|p)\s*\.\s*(?:updated_at|review_note)\b/i);
+  assert.match(read('server/src/adminReview.ts'), /e\.review_note AS reviewNote/);
+
+  const superseded = JSON.parse(read('database/migrations/superseded.json')) as Record<string, string>;
+  assert.match(superseded['002'], /pitch_review_event/);
+  assert.match(superseded['002'], /not consumed/);
 });
 
 test('migration 003 is superseded: real user_saved_pitch has the shape documented in the baseline', () => {
@@ -101,9 +130,24 @@ test('migration 003 is superseded: real user_saved_pitch has the shape documente
   const files = loadMigrations(path.join(root, 'database/migrations'));
   const m003 = files.find((f) => f.version === '003')!;
   assert.ok(m003.superseded);
+  assert.throws(() => assertMigrationCanBeMarked(m003), /superseded and cannot be marked applied/);
   assert.equal(stripSqlComments(m003.sql).trim(), '', '003 must contain no executable SQL');
   const plan = planMigrations(files, []);
-  assert.deepEqual(plan.pending.map((f) => f.version), ['001', '002']);
+  assert.deepEqual(plan.pending.map((f) => f.version), ['001', '004']);
+  assert.ok(files.find((f) => f.version === '002')?.superseded);
+  assert.ok(files.find((f) => f.version === '003')?.superseded);
+});
+
+test('clean baseline sequence records 001, skips superseded 002/003, leaves 004 as the only draft pending', () => {
+  const files = loadMigrations(path.join(root, 'database/migrations'));
+  const marks = planBaselineMarks(JSON.parse(read('database/baseline/BASELINE_INFO.json')), files);
+  assert.deepEqual(marks.map((f) => f.version), ['001']);
+  const baselineRows = marks.map((f) => ({ version: f.version, checksum_sha256: f.checksum, status: 'BASELINED' as const }));
+  const plan = planMigrations(files, baselineRows);
+  assert.deepEqual(plan.problems, []);
+  assert.deepEqual(plan.pending.map((f) => f.version), ['004']);
+  assert.equal(plan.pending[0].isDraft, true, '004 remains DRAFT until reviewed');
+  assert.equal(plan.pending[0].superseded, undefined);
 });
 
 test('baseline info is valid and only claims 001', () => {
@@ -112,16 +156,24 @@ test('baseline info is valid and only claims 001', () => {
   assert.deepEqual(marks.map((f) => f.version), ['001']);
 });
 
-test('backend INSERT targets and columns exist in the baseline', () => {
-  const srcDir = path.join(root, 'server/src');
+test('backend INSERT targets and columns exist in baseline or the draft migration that owns them', () => {
+  const srcFiles = sourceFilesUnder(path.join(root, 'server/src')).filter((file) => !path.basename(file).startsWith('test_'));
+  const migrationFiles = loadMigrations(path.join(root, 'database/migrations'));
+  const migrationTables = new Map<string, TableDef>();
+  // New runtime tables are allowed only when the migration source in this repository defines them.
+  // In particular, pitch_review_event is intentionally absent from the baseline while 004 is DRAFT.
+  for (const migration of migrationFiles) {
+    for (const [name, def] of parseTables(migration.sql)) migrationTables.set(name, def);
+  }
   let checked = 0;
-  for (const f of fs.readdirSync(srcDir).filter((x) => x.endsWith('.ts') && !x.startsWith('test_'))) {
-    const src = fs.readFileSync(path.join(srcDir, f), 'utf8');
+  for (const file of srcFiles) {
+    const src = fs.readFileSync(file, 'utf8');
+    const relative = path.relative(path.join(root, 'server/src'), file);
     for (const m of src.matchAll(/INSERT\s+(?:IGNORE\s+)?INTO\s+(\w+)\s*\(([^)]*)\)/gi)) {
-      const t = baseline.get(m[1]);
-      assert.ok(t, `${f}: INSERT into unknown table ${m[1]}`);
+      const t = baseline.get(m[1]) ?? migrationTables.get(m[1]);
+      assert.ok(t, `${relative}: INSERT into unknown table ${m[1]} (not in baseline or any migration)`);
       for (const col of m[2].split(',').map((c) => c.trim()).filter(Boolean)) {
-        assert.ok(t.columns.has(col), `${f}: ${m[1]}.${col} not in baseline`);
+        assert.ok(t.columns.has(col), `${relative}: ${m[1]}.${col} not defined in baseline/migrations`);
         checked++;
       }
     }

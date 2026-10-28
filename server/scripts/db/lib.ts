@@ -110,7 +110,7 @@ export function checksumOf(sql: string): string {
   return crypto.createHash('sha256').update(sql.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
 }
 
-/** Reads database/migrations/superseded.json ({ "003": "reason" }). Missing file => none. */
+/** Reads database/migrations/superseded.json ({ "NNN": "reason" }). Missing file => none. */
 export function loadSuperseded(dir: string): Record<string, string> {
   const p = path.join(dir, 'superseded.json');
   if (!fs.existsSync(p)) return {};
@@ -121,6 +121,13 @@ export function loadSuperseded(dir: string): Record<string, string> {
     }
   }
   return parsed as Record<string, string>;
+}
+
+/** Refuse an explicit operator mark for a migration that the project has superseded. */
+export function assertMigrationCanBeMarked(migration: MigrationFile): void {
+  if (migration.superseded) {
+    throw new Error(`Migration ${migration.version} is superseded and cannot be marked applied: ${migration.superseded}`);
+  }
 }
 
 export function loadMigrations(dir: string): MigrationFile[] {

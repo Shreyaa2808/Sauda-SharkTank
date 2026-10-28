@@ -39,6 +39,16 @@ export interface FounderPitch {
   submittedAt: string;
 }
 
+export interface FounderReviewEvent {
+  reviewEventId: number;
+  pitchId: number;
+  decision: 'PUBLISH' | 'REJECT';
+  reviewNote: string | null;
+  decidedAt: string;
+  reviewerUserId: number;
+  reviewerName: string;
+}
+
 export interface FounderMetrics {
   totalCount: number;
   draftCount: number;

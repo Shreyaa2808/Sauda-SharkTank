@@ -4,11 +4,13 @@ import './NavDrawer.css';
 
 export type DrawerRoute =
   | 'discovery'
+  | 'dashboard'
   | 'founder'
   | 'investor'
   | 'connections'
   | 'profile'
-  | 'settings';
+  | 'settings'
+  | 'admin';
 
 interface NavDrawerProps {
   isOpen: boolean;
@@ -29,19 +31,23 @@ const FOCUSABLE =
 
 const ROUTE_PATHS: Record<DrawerRoute, string> = {
   discovery: '/',
+  dashboard: '/dashboard',
   founder: '/founder',
   investor: '/investor',
   connections: '/connections',
   profile: '/profile',
   settings: '/settings',
+  admin: '/admin/reviews',
 };
 
 /* Clean inline SVG icons (no icon dependency). */
-const Icon: React.FC<{ name: 'discover' | 'founder' | 'investor' | 'connections' | 'profile' | 'settings' | 'workspaces' | 'signin' | 'signout' | 'close' }> = ({ name }) => {
+const Icon: React.FC<{ name: 'discover' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'profile' | 'settings' | 'admin' | 'workspaces' | 'signin' | 'signout' | 'close' }> = ({ name }) => {
   const common = { width: 18, height: 18, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
   switch (name) {
     case 'discover':
       return (<svg {...common}><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>);
+    case 'dashboard':
+      return (<svg {...common}><rect x="3" y="3" width="5.5" height="5.5" rx="1" /><rect x="11.5" y="3" width="5.5" height="5.5" rx="1" /><rect x="3" y="11.5" width="5.5" height="5.5" rx="1" /><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1" /></svg>);
     case 'founder':
       return (<svg {...common}><path d="M3 17h14" /><path d="M5 17V9l5-5 5 5v8" /><path d="M8.5 17v-4h3v4" /></svg>);
     case 'investor':
@@ -52,6 +58,8 @@ const Icon: React.FC<{ name: 'discover' | 'founder' | 'investor' | 'connections'
       return (<svg {...common}><circle cx="10" cy="7" r="3" /><path d="M4 16.5c0-3 2.7-4.5 6-4.5s6 1.5 6 4.5" /></svg>);
     case 'settings':
       return (<svg {...common}><path d="M4 6h8M15 6h1M4 14h1M8 14h8" /><circle cx="13.5" cy="6" r="1.6" /><circle cx="6.5" cy="14" r="1.6" /></svg>);
+    case 'admin':
+      return (<svg {...common}><path d="M10 2.5l6 2.2v4.9c0 3.3-2.2 6.1-6 7.9-3.8-1.8-6-4.6-6-7.9V4.7l6-2.2z" /><path d="M7 9.8l2 2 4-4" /></svg>);
     case 'workspaces':
       return (<svg {...common}><rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1" /><rect x="11" y="3.5" width="5.5" height="5.5" rx="1" /><rect x="3.5" y="11" width="5.5" height="5.5" rx="1" /><rect x="11" y="11" width="5.5" height="5.5" rx="1" /></svg>);
     case 'signin':
@@ -132,6 +140,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
   const roles = currentUser?.roles ?? [];
   const hasFounder = roles.includes('FOUNDER');
   const hasInvestor = roles.includes('INVESTOR');
+  const hasAdmin = roles.includes('ADMIN');
   const initial = currentUser?.fullName?.trim().charAt(0).toUpperCase() || 'U';
 
   const go = (route: DrawerRoute) => {
@@ -203,9 +212,11 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
             <p className="nav-drawer-section-label">Navigate</p>
             <ul className="nav-drawer-list">
               {renderLink('discovery', 'Startup Discovery', 'discover')}
+              {currentUser && renderLink('dashboard', 'Dashboard', 'dashboard', 'Your workspace overview')}
               {currentUser && hasFounder && renderLink('founder', 'Founder Workspace', 'founder')}
               {currentUser && hasInvestor && renderLink('investor', 'Investor Deal Room', 'investor')}
               {currentUser && (hasFounder || hasInvestor) && renderLink('connections', 'Connections', 'connections')}
+              {currentUser && hasAdmin && renderLink('admin', 'Admin Review Queue', 'admin', 'Review submitted pitches')}
             </ul>
           </nav>
 

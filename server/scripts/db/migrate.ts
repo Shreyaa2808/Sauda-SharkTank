@@ -19,6 +19,7 @@ import mysql from 'mysql2/promise';
 import type { RowDataPacket } from 'mysql2';
 import {
   assertDisposableTestTarget,
+  assertMigrationCanBeMarked,
   loadMigrations,
   planMigrations,
   resolveTarget,
@@ -50,10 +51,21 @@ async function main() {
     return;
   }
 
+  // Refuse invalid/superseded explicit marks before opening any DB connection or creating the tracking table.
+  const markVersion = arg('mark-applied');
+  if (markVersion !== undefined) {
+    const candidate = files.find((x) => x.version === markVersion);
+    if (!candidate) return fail(`No migration file with version ${markVersion}.`);
+    try {
+      assertMigrationCanBeMarked(candidate);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   const kind = (arg('target') ?? 'main') as 'main' | 'test';
   if (kind !== 'main' && kind !== 'test') fail('--target must be "main" or "test".');
   const apply = flag('apply');
-  const markVersion = arg('mark-applied');
   const writing = apply || markVersion !== undefined;
 
   let target: DbTarget;
@@ -114,8 +126,7 @@ async function main() {
     if (plan.problems.length) fail(`Stopped:\n - ${plan.problems.join('\n - ')}`);
 
     if (markVersion !== undefined) {
-      const f = files.find((x) => x.version === markVersion);
-      if (!f) return fail(`No migration file with version ${markVersion}.`);
+      const f = files.find((x) => x.version === markVersion)!;
       if (applied.some((a) => a.version === f.version)) return fail(`${f.version} is already recorded.`);
       await conn.execute(
         "INSERT INTO schema_migrations (version, filename, checksum_sha256, status, applied_at, applied_by) VALUES (?, ?, ?, 'BASELINED', CURRENT_TIMESTAMP, ?)",

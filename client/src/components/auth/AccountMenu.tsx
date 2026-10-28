@@ -6,7 +6,7 @@ interface AccountMenuProps {
   user: AuthUser;
   /** Current app route is used to show the workspace currently in use. */
   currentRoute: string;
-  onNavigate: (route: 'profile' | 'settings' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'discovery') => void;
+  onNavigate: (route: 'profile' | 'settings' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'discovery' | 'admin') => void;
   onOpenWorkspaces: () => void;
   onLogout: () => void;
 }
@@ -71,7 +71,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   }, [isOpen]);
 
   const handleSelectRoute = (
-    route: 'profile' | 'settings' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'discovery',
+    route: 'profile' | 'settings' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'discovery' | 'admin',
   ) => {
     setIsOpen(false);
     onNavigate(route);
@@ -90,10 +90,13 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
       ? 'INVESTOR'
       : currentRoute === 'dashboard'
         ? 'VIEWER'
-        : primaryRole;
+        : currentRoute === 'admin' && user.roles.includes('ADMIN')
+          ? 'ADMIN'
+          : primaryRole;
   const roleLabel = user.roles && user.roles.length > 0 ? user.roles.join(' · ') : 'VIEWER';
   const hasFounder = user.roles && user.roles.includes('FOUNDER');
   const hasInvestor = user.roles && user.roles.includes('INVESTOR');
+  const hasAdmin = user.roles && user.roles.includes('ADMIN');
 
   return (
     <div ref={menuRef} className="account-menu-container">
@@ -178,6 +181,26 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                 <span className="menu-item-sub">Your Sauda overview</span>
               </div>
             </button>
+
+            {hasAdmin && (
+              <button
+                type="button"
+                role="menuitem"
+                className="account-menu-item"
+                onClick={() => handleSelectRoute('admin')}
+              >
+                <div className="menu-item-icon" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                    <path d="M8 1.5l5 1.8v4.1c0 2.8-1.8 5.1-5 6.8-3.2-1.7-5-4-5-6.8V3.3L8 1.5z" stroke="currentColor" strokeWidth="1.3" />
+                    <path d="M5.5 7.8l1.6 1.6 3.5-3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div className="menu-item-labels">
+                  <span className="menu-item-title">Admin Review Queue</span>
+                  <span className="menu-item-sub">Review submitted platform pitches</span>
+                </div>
+              </button>
+            )}
 
             {/* Workspace Chooser Trigger */}
             <button

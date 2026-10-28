@@ -987,3 +987,68 @@
     scroll-behavior: auto !important;
   }
 }
+
+
+/* Admin review feedback shown only to the pitch's owning founder. */
+.pitch-review-feedback-btn {
+  padding: 9px 12px;
+  border: 1px solid rgba(213, 177, 107, 0.38);
+  border-radius: 8px;
+  background: rgba(213, 177, 107, 0.09);
+  color: #e4c584;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pitch-review-feedback-btn:hover { background: rgba(213, 177, 107, 0.16); }
+.pitch-review-feedback-btn:focus-visible,
+.founder-review-modal-panel button:focus-visible { outline: 3px solid #66d1c9; outline-offset: 3px; }
+.founder-review-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow-y: auto;
+  background: rgba(1, 8, 14, 0.78);
+  backdrop-filter: blur(8px);
+}
+.founder-review-modal-panel {
+  width: min(680px, 100%);
+  max-height: min(85vh, 820px);
+  overflow-y: auto;
+  padding: clamp(20px, 4vw, 30px);
+  border: 1px solid rgba(213, 177, 107, 0.32);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #102b3e, #071521 78%);
+  color: #f4f0e8;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
+}
+.founder-review-modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+.founder-review-modal-header h2 { margin: 10px 0 0; font: 700 clamp(1.5rem, 4vw, 2rem)/1.1 Georgia, 'Times New Roman', serif; overflow-wrap: anywhere; }
+.founder-review-modal-close { flex: 0 0 38px; width: 38px; height: 38px; border: 1px solid rgba(169, 189, 204, 0.25); border-radius: 10px; background: rgba(0, 0, 0, 0.16); color: #e9f0f4; font-size: 1.4rem; cursor: pointer; }
+.founder-review-modal-intro { color: #a9bdcc; line-height: 1.6; margin: 16px 0 20px; font-size: 0.9rem; }
+.founder-review-modal-state, .founder-review-modal-error { padding: 18px; border-radius: 10px; background: rgba(1, 14, 23, 0.5); color: #a9bdcc; line-height: 1.55; }
+.founder-review-modal-error { color: #ffbdb4; border: 1px solid rgba(242, 124, 109, 0.25); }
+.founder-review-timeline { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }
+.founder-review-timeline li { padding: 15px; border: 1px solid rgba(169, 189, 204, 0.15); border-radius: 12px; background: rgba(1, 14, 23, 0.48); }
+.founder-review-timeline-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.founder-review-timeline-top strong { font-size: 0.88rem; }
+.founder-review-timeline-top strong.rejected { color: #ff9e91; }
+.founder-review-timeline-top strong.published { color: #73d8bd; }
+.founder-review-timeline time, .founder-review-timeline-reviewer { color: #879eaf; font-size: 0.75rem; }
+.founder-review-timeline-reviewer { display: block; margin-top: 5px; }
+.founder-review-timeline p { margin: 10px 0 0; color: #d7e0e5; white-space: pre-wrap; line-height: 1.6; font-size: 0.88rem; }
+.founder-review-timeline p.founder-review-no-note { color: #879eaf; font-style: italic; }
+.founder-review-modal-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+@media (max-width: 560px) {
+  .founder-review-modal-overlay { padding: 10px; }
+  .founder-review-modal-panel { max-height: 92vh; padding: 18px; }
+  .founder-review-timeline-top { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .founder-review-modal-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .founder-review-modal-panel *, .founder-review-modal-panel *::before, .founder-review-modal-panel *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

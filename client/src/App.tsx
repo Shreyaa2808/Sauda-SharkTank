@@ -20,6 +20,7 @@ import { ComparisonTray } from './components/compare/ComparisonTray.tsx';
 import { ComparisonMatrix } from './components/compare/ComparisonMatrix.tsx';
 import { DiscoveryHero } from './components/home/DiscoveryHero.tsx';
 import { ViewerDashboard } from './components/dashboard/ViewerDashboard.tsx';
+import { AdminReviewPage } from './components/admin/AdminReviewPage.tsx';
 import { NotFoundPage } from './components/notfound/NotFoundPage.tsx';
 import { computeRegistryMetrics } from './utils/registryMetrics.ts';
 import { fetchStartups } from './services/api.ts';
@@ -33,7 +34,7 @@ import {
 } from './utils/formatters.ts';
 
 type FilterType = 'ALL' | PitchType;
-type KnownRoute = 'discovery' | 'login' | 'dashboard' | 'profile' | 'settings' | 'founder' | 'investor' | 'connections';
+type KnownRoute = 'discovery' | 'login' | 'dashboard' | 'profile' | 'settings' | 'founder' | 'investor' | 'connections' | 'admin';
 // 'notfound' is a real view for unrecognised URLs; it has no path of its own (the address bar keeps the requested URL).
 type AppRoute = KnownRoute | 'notfound';
 
@@ -51,10 +52,11 @@ const ROUTE_PATHS: Record<KnownRoute, string> = {
   founder: '/founder',
   investor: '/investor',
   connections: '/connections',
+  admin: '/admin/reviews',
 };
 
 // Routes that need a server-verified session. Role checks for workspaces are layered on top.
-const AUTH_REQUIRED_ROUTES: AppRoute[] = ['dashboard', 'profile', 'settings', 'founder', 'investor', 'connections'];
+const AUTH_REQUIRED_ROUTES: AppRoute[] = ['dashboard', 'profile', 'settings', 'founder', 'investor', 'connections', 'admin'];
 const ROUTE_LABELS: Record<AppRoute, string> = {
   notfound: 'Page Not Found',
   discovery: 'Startup Discovery',
@@ -65,8 +67,9 @@ const ROUTE_LABELS: Record<AppRoute, string> = {
   founder: 'Founder Workspace',
   investor: 'Investor Deal Room',
   connections: 'Connections',
+  admin: 'Admin Review Queue',
 };
-const WORKSPACE_ROUTES: AppRoute[] = ['dashboard', 'founder', 'investor', 'connections'];
+const WORKSPACE_ROUTES: AppRoute[] = ['dashboard', 'founder', 'investor', 'connections', 'admin'];
 
 const pathToRoute = (rawPath: string): AppRoute => {
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
@@ -635,6 +638,13 @@ export const App: React.FC = () => {
         ) : (
           <WorkspaceGate {...gateProps} kind="connections" />
         )
+      )}
+
+      {isInitialAuthDone && currentRoute === 'admin' && (
+        <AdminReviewPage
+          authorized={Boolean(currentUser && hasRole('ADMIN'))}
+          onReturnToDashboard={() => navigateTo('dashboard')}
+        />
       )}
 
       {/* NOT FOUND: unrecognised URLs never fall through to discovery */}

@@ -1,11 +1,18 @@
 /**
- * Creates (or, with --recreate, rebuilds) the DISPOSABLE test database from the reviewed baseline.
+ * Loads the reviewed baseline into a pre-created, EMPTY disposable test database.
  *
- *   SAUDA_ALLOW_DESTRUCTIVE_TESTS=yes npm run db:test:create [-- --recreate]
+ * Provision the schema as a MySQL administrator first, then grant the test account
+ * privileges only on that schema:
+ *   CREATE DATABASE `sauda_test_local` CHARACTER SET utf8mb4;
+ *   GRANT ALL PRIVILEGES ON `sauda_test_local`.* TO 'sauda_test_user'@'127.0.0.1';
  *
- * Uses only TEST_DB_* settings (see server/test.env.example). It can never act on DB_NAME,
- * sharktank_db, or any name outside ^sauda_test_[a-z0-9_]+$.
- * It refuses to run until a genuine baseline exists in database/baseline/ (see database/README.md).
+ * Then run:
+ *   SAUDA_ALLOW_DESTRUCTIVE_TESTS=yes npm run db:test:create
+ *
+ * This script deliberately never CREATEs or DROPs databases. The test account therefore
+ * does not need global CREATE/DROP privileges and cannot use this script to destroy other
+ * schemas. To rebuild a test schema, an administrator must explicitly drop and recreate
+ * only a verified `sauda_test_*` schema, then run this loader again.
  */
 import 'dotenv/config';
 import fs from 'node:fs';
@@ -13,13 +20,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import mysql from 'mysql2/promise';
 import type { RowDataPacket } from 'mysql2';
-import os from 'node:os';
-import { assertDisposableTestTarget, loadMigrations, planBaselineMarks, resolveTarget } from './lib.js';
+import { assertDisposableTestTarget, resolveTarget } from './lib.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BASELINE_DIR = path.resolve(here, '../../../database/baseline');
-const MIGRATIONS_DIR = path.resolve(here, '../../../database/migrations');
-const TRACKING_SQL = path.resolve(here, '../../../database/schema_migrations.sql');
 
 function fail(msg: string, code = 1): never {
   console.error(`[test-db] ${msg}`);
@@ -30,53 +34,57 @@ async function main() {
   const target = resolveTarget('test', process.env);
   assertDisposableTestTarget(target, process.env);
 
+  if (process.argv.includes('--recreate')) {
+    return fail(
+      'Refusing --recreate: this tool never drops databases. Have an administrator verify and recreate only the intended sauda_test_* database, then run the baseline loader again.',
+    );
+  }
+
   const baselineFiles = fs.existsSync(BASELINE_DIR)
     ? fs.readdirSync(BASELINE_DIR).filter((f) => /^\d+_.*\.sql$/.test(f)).sort()
     : [];
   if (baselineFiles.length === 0) {
     return fail(
-      'BLOCKED: no reviewed baseline found in database/baseline/. A schema-only export of the real database is required\n' +
-        '         before a test database can be built (see docs/phase-2-schema-reconciliation.md, section 5). Nothing was created.',
+      'BLOCKED: no reviewed baseline found in database/baseline/. A schema-only export of the real database is required before a test database can be built (see docs/phase-2-schema-reconciliation.md, section 5). Nothing was loaded.',
       3,
     );
   }
 
-  const admin = await mysql.createConnection({
-    host: target.host, port: target.port, user: target.user, password: target.password, multipleStatements: true,
+  // Connect directly to the one explicitly configured test schema. This requires only
+  // schema-level privileges; it does not require global CREATE or DROP DATABASE.
+  const conn = await mysql.createConnection({
+    host: target.host,
+    port: target.port,
+    user: target.user,
+    password: target.password,
+    database: target.database,
+    multipleStatements: true,
   });
+
   try {
-    const [exists] = await admin.query<RowDataPacket[]>('SELECT 1 FROM information_schema.schemata WHERE schema_name = ?', [target.database]);
-    if (exists.length) {
-      if (!process.argv.includes('--recreate')) return fail(`Database ${target.database} already exists. Pass --recreate to drop and rebuild it.`);
-      assertDisposableTestTarget(target, process.env); // re-check immediately before the only DROP in this codebase
-      await admin.query(`DROP DATABASE \`${target.database}\``);
-      console.log(`[test-db] dropped ${target.database}`);
-    }
-    await admin.query(`CREATE DATABASE \`${target.database}\` CHARACTER SET utf8mb4`);
-    await admin.query(`USE \`${target.database}\``);
-    for (const f of baselineFiles) {
-      console.log(`[test-db] loading baseline ${f}`);
-      await admin.query(fs.readFileSync(path.join(BASELINE_DIR, f), 'utf8'));
+    const [[db]] = await conn.query<RowDataPacket[]>('SELECT DATABASE() AS name');
+    if (db.name !== target.database) {
+      return fail(`Connected to "${db.name}", expected "${target.database}".`);
     }
 
-    // Record the migrations the baseline is documented to contain (BASELINE_INFO.json), visibly.
-    const infoPath = path.join(BASELINE_DIR, 'BASELINE_INFO.json');
-    if (fs.existsSync(infoPath)) {
-      const marks = planBaselineMarks(JSON.parse(fs.readFileSync(infoPath, 'utf8')), loadMigrations(MIGRATIONS_DIR));
-      await admin.query(fs.readFileSync(TRACKING_SQL, 'utf8'));
-      for (const f of marks) {
-        await admin.query(
-          "INSERT INTO schema_migrations (version, filename, checksum_sha256, status, applied_at, applied_by) VALUES (?, ?, ?, 'BASELINED', CURRENT_TIMESTAMP, ?)",
-          [f.version, f.filename, f.checksum, os.userInfo().username],
-        );
-        console.log(`[test-db] recorded ${f.filename} as BASELINED (documented in BASELINE_INFO.json)`);
-      }
-    } else {
-      console.log('[test-db] no BASELINE_INFO.json: no migrations were recorded; record any included ones with --mark-applied.');
+    const [existing] = await conn.execute<RowDataPacket[]>(
+      'SELECT table_name FROM information_schema.tables WHERE table_schema = ? LIMIT 1',
+      [target.database],
+    );
+    if (existing.length) {
+      return fail(
+        `Database ${target.database} is not empty (found at least one table/view). Nothing was changed. Use a new empty sauda_test_* database or have an administrator verify and recreate this test database before retrying.`,
+      );
     }
-    console.log('[test-db] baseline loaded. Next: npm run db:migrate -- --target test   (add --apply to run pending migrations).');
+
+    for (const f of baselineFiles) {
+      console.log(`[test-db] loading baseline ${f} into ${target.database}`);
+      await conn.query(fs.readFileSync(path.join(BASELINE_DIR, f), 'utf8'));
+    }
+    console.log(`[test-db] baseline loaded into ${target.database}. Next: npm run db:migrate -- --target test (add --apply only after reviewing the plan).`);
+    console.log('[test-db] No database was created or dropped by this script.');
   } finally {
-    await admin.end();
+    await conn.end();
   }
 }
 

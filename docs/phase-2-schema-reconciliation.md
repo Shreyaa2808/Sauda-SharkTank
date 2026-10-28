@@ -16,7 +16,7 @@ Remaining open items are listed in section 8.
 | Migration | Represented in export? | Evidence | Status now |
 |---|---|---|---|
 | **001** auth + connections + messaging | **Yes, fully** | `app_user.google_subject` (utf8mb4_bin) + `uq_app_user_google_subject` + 3 CHECKs; `password_hash` nullable; `connection_request`, `conversation`, `message` with every column, key, FK and CHECK of the draft (including the generated `active_*` columns and `uq_connection_request_active_pair`). Verified object-by-object by `baseline.test.ts`. | File left **unchanged and still marked DRAFT**. It is part of the baseline; never run it on a database that has these objects. |
-| **002** pitch `updated_at` / `review_note` | **No** | `pitch` has neither column. | Unchanged, **pending draft**. Do not apply as-is; Phase 3 needs reviewer/decision/audit data that 002 does not provide. |
+| **002** pitch `updated_at` / `review_note` | **No** | `pitch` has neither column, and a static scan found no runtime use of `pitch.updated_at` or `pitch.review_note`. | **Superseded** and retained unchanged for historical reference. `updated_at` has no current consumer; review decisions/notes are recorded by 004 in `pitch_review_event`. The runner skips 002. This does not approve 004. |
 | **003** `user_saved_pitch` (my first-pass draft) | **Superseded — my earlier claim was wrong** | The table **already exists** in the export from the original schema, with an extra `private_notes text` column and non-cascading FKs. 41 tables = the 38 original + the 3 from 001, so it pre-dates 001. | File replaced by a comment-only tombstone; listed in `database/migrations/superseded.json`; the runner skips it. |
 
 I previously reported `user_saved_pitch` as missing from the database. It was only missing from the repo's migrations
@@ -41,15 +41,17 @@ Every column the backend reads or writes exists: all `INSERT` column lists are e
 - `database/baseline/002_reference_seed.sql` — only the four role names the code looks up by name
   (`VIEWER`, `FOUNDER`, `INVESTOR`, `ADMIN`), via `INSERT IGNORE` on the unique `role_name`; ids not hardcoded; **no users, no admin account**.
 - `database/baseline/BASELINE_INFO.json` — declares the baseline contains migration 001 with the evidence statement. Used by `db:test:create`.
-- `database/migrations/superseded.json` + the 003 tombstone; runner and `create_test_db.ts` updated; tests in `scripts/db/baseline.test.ts` and `lib.test.ts`.
+- `database/migrations/superseded.json` lists 002 and 003. Migration 002 remains unchanged as a draft for historical reference; migration 003 remains a comment-only tombstone. The runner skips both and refuses to manually mark either as applied. Tests cover this and the clean-baseline plan.
 
 **Not seeded (no evidence of the values):** `industry` (the clone had 4 rows) and `startup_stage` (6 rows). Until supplied, a fresh database has no industry/stage choices for the founder form.
 
 ## 5. Test-database workflow (static verification only)
 `db:test:create` → guard checks → loads `baseline/*.sql` in order → creates `schema_migrations` → records the migrations listed in
-`BASELINE_INFO.json` (001) as `BASELINED`, printing each. Then `db:migrate -- --target test` shows **002 as the only pending (draft)
-migration**. This was checked by unit test (`planMigrations` over the real migration folder returns `['001','002']` when
-nothing is recorded, and the baseline marks 001). The workflow was **not executed**: no MySQL server was used.
+`BASELINE_INFO.json` records 001 as `BASELINED`, and the runner prints the migration it recorded. The clean-test plan then skips
+superseded migrations 002 and 003 and leaves **004 as the only pending migration**. Migration 004 remains marked DRAFT;
+the runner permits an explicitly opted-in apply only when the target is a guarded disposable `sauda_test_*` database, so
+Phase 3 can be integration-tested without approving it for the main database. This sequence is covered by static unit
+tests but has **not** been executed against MySQL in this patch.
 
 ## 6. Triggers and routines — report only, nothing changed
 - The export contains **no `CREATE TRIGGER`/routine definitions**. The Phase D document reported six triggers on `sharktank_db`, including
@@ -62,7 +64,7 @@ nothing is recorded, and the baseline marks 001). The workflow was **not execute
 ## 7. Other observations for later phases (no action taken)
 - `show_season.country_franchise` is free text (default `'India'`) and money columns carry no currency code → Phase 6 design.
 - `offer`, `offer_investor`, `closed_deal`, `deal_status_history`, `show_episode`, `episode_shark_seat`, `shark` already exist → Phase 5 should build on them, not duplicate.
-- `pitch` has no `updated_at`/review/decision columns → Phase 3.
+- `pitch` has no `updated_at`/legacy `review_note` column. No current runtime consumer needs them; migration 002 is superseded. Phase 3 review decisions and notes use the separate `pitch_review_event` table introduced by draft migration 004.
 - `pitch.company_id` composite unique keys and `company_metric_snapshot` FKs mean seed order matters (company → snapshot → pitch).
 
 ## 8. Missing information (exact list) — do not guess
@@ -74,7 +76,7 @@ nothing is recorded, and the baseline marks 001). The workflow was **not execute
 ## 9. Updated migration checklist
 1. Verified backup of the target; record path/size.
 2. Run `phase2_readonly_schema_inspection.sql` on the target; compare with section 2 above.
-3. Fresh/disposable DB: `db:test:create` (baseline + 001 recorded) → `db:migrate -- --target test` (status). Apply 002 only if you decide to (draft; Phase 3 will likely replace it).
+3. Fresh/disposable DB: `db:test:create` (baseline + 001 recorded) → `db:migrate -- --target test` (status). Migrations 002/003 are skipped as superseded; 004 is the only pending DRAFT. After review, apply 004 only to the guarded disposable test DB with explicit opt-in, then exercise publish/reject/history/concurrency checks.
 4. Existing DB that already has the 001 objects: mark 001 yourself with `--mark-applied 001` after step 2 confirms it. This tool never does it automatically.
 5. Never run `001` or the baseline on a database that already has those tables.
 6. Change a draft to reviewed only by editing its `-- STATUS: DRAFT` header after teammate sign-off.

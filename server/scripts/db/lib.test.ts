@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  assertDisposableTestTarget, validateDisposableTestDbName, resolveTarget, isDraftMigration,
+  assertDisposableTestTarget, assertMigrationCanBeMarked, validateDisposableTestDbName, resolveTarget, isDraftMigration,
   checksumOf, loadMigrations, loadSuperseded, planBaselineMarks, planMigrations, type DbTarget, type MigrationFile,
 } from './lib.js';
 
@@ -72,6 +72,12 @@ test('planMigrations: pending, APPLYING block, checksum drift, out-of-order', ()
   assert.match(planMigrations(files, [{ version: '001', checksum_sha256: 'bad', status: 'APPLIED' }]).problems.join(), /checksum/);
   assert.match(planMigrations(files, [{ version: '003', checksum_sha256: files[2].checksum, status: 'APPLIED' }]).problems.join(), /Out-of-order/);
   assert.match(planMigrations(files, [{ version: '009', checksum_sha256: 'x', status: 'APPLIED' }]).problems.join(), /no matching file/);
+});
+
+test('superseded migrations cannot be explicitly marked as applied', () => {
+  const current = { ...mf('002'), superseded: 'Replaced by a later migration.' };
+  assert.throws(() => assertMigrationCanBeMarked(current), /superseded and cannot be marked applied/);
+  assert.doesNotThrow(() => assertMigrationCanBeMarked(mf('004')));
 });
 
 test('superseded migrations are skipped by the planner and validated on load', () => {
