@@ -2,7 +2,39 @@ import { dbPool } from './db.js';
 import { signSession } from './auth.js';
 import type { RowDataPacket } from 'mysql2';
 
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = (process.env.SAUDA_TEST_API_BASE ?? '').trim();
+const integrationApiUrl = (() => {
+  try {
+    return API_BASE ? new URL(API_BASE) : null;
+  } catch {
+    return null;
+  }
+})();
+const safeApiTarget =
+  integrationApiUrl !== null &&
+  integrationApiUrl.protocol === 'http:' &&
+  ['localhost', '127.0.0.1'].includes(integrationApiUrl.hostname) &&
+  integrationApiUrl.port !== '' &&
+  integrationApiUrl.port !== '4000' &&
+  integrationApiUrl.pathname === '/api' &&
+  !integrationApiUrl.username &&
+  !integrationApiUrl.password &&
+  !integrationApiUrl.search &&
+  !integrationApiUrl.hash;
+
+// This suite creates users, pitches, requests, conversations and messages. Require
+// an explicit opt-in and a local disposable database before making any requests.
+const integrationDbName = (process.env.DB_NAME ?? '').trim();
+const integrationDbHost = (process.env.DB_HOST ?? '').trim().toLowerCase();
+const integrationTestEnabled = process.env.SAUDA_RUN_WORKSPACE_SECURITY_TESTS === '1';
+const localDbHost = ['localhost', '127.0.0.1', '::1'].includes(integrationDbHost);
+const disposableDbName = /^sauda_test_[a-z0-9_]+$/i.test(integrationDbName);
+if (!integrationTestEnabled || !localDbHost || !disposableDbName || !safeApiTarget) {
+  console.error(
+    '[REFUSED] Require explicit opt-in, a local sauda_test_* database, and SAUDA_TEST_API_BASE pointing to a local /api URL on a port other than 4000.',
+  );
+  process.exit(1);
+}
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -251,7 +283,21 @@ async function runTests() {
 
   // 8. Connection & Messaging Lifecycle
   console.log('\n--- 8. CONNECTION & MESSAGING LIFECYCLE ---');
-  // Clean any prior test request between these two
+  // Clean prior rows for these explicitly named test identities in FK order.
+  // This also makes repeat runs possible when the previous run created a conversation.
+  await dbPool.execute(
+    `DELETE m FROM message m
+     INNER JOIN conversation c ON c.conversation_id = m.conversation_id
+     INNER JOIN connection_request cr ON cr.request_id = c.request_id
+     WHERE cr.investor_user_id = ? AND cr.founder_user_id = ?`,
+    [investorUser.user_id, founderUser.user_id],
+  );
+  await dbPool.execute(
+    `DELETE c FROM conversation c
+     INNER JOIN connection_request cr ON cr.request_id = c.request_id
+     WHERE cr.investor_user_id = ? AND cr.founder_user_id = ?`,
+    [investorUser.user_id, founderUser.user_id],
+  );
   await dbPool.execute(
     `DELETE FROM connection_request WHERE investor_user_id = ? AND founder_user_id = ?`,
     [investorUser.user_id, founderUser.user_id],
@@ -298,12 +344,21 @@ async function runTests() {
   });
   assert(intruderAcceptRes.status === 403, 'Intruder cannot respond to founder connection request (403)');
 
-  // Founder accepts request -> conversation opened!
-  const founderAcceptRes = await fetch(`${API_BASE}/connections/${requestId}/respond`, {
+  // Race two accept decisions. Row locking should allow one transition and
+  // reject the second stale decision without creating a duplicate conversation.
+  const acceptAttempt = () => fetch(`${API_BASE}/connections/${requestId}/respond`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: founderCookie },
     body: JSON.stringify({ action: 'ACCEPT' }),
   });
+  const acceptRaceResponses = await Promise.all([acceptAttempt(), acceptAttempt()]);
+  const acceptedResponses = acceptRaceResponses.filter((response) => response.status === 200);
+  const staleResponses = acceptRaceResponses.filter((response) => response.status === 400);
+  assert(
+    acceptedResponses.length === 1 && staleResponses.length === 1,
+    'Concurrent accept decisions produce exactly one success and one invalid-state response',
+  );
+  const founderAcceptRes = acceptedResponses[0] ?? acceptRaceResponses[0];
   assert(founderAcceptRes.status === 200, 'Founder accepted connection request (200)');
   const founderAcceptJson = await founderAcceptRes.json();
   assert(founderAcceptJson.request.requestStatus === 'ACCEPTED', 'Request status is ACCEPTED');
@@ -340,12 +395,25 @@ async function runTests() {
   });
   assert(intruderSendRes.status === 403, 'Non-participant cannot send message in conversation (403)');
 
-  // End connection
-  const endConnRes = await fetch(`${API_BASE}/connections/${requestId}/end`, {
-    method: 'POST',
-    headers: { Cookie: investorCookie },
-  });
+  // Race a send against ending the connection. A send may succeed if it obtains
+  // the conversation lock first, or be rejected if ending wins; it must not be
+  // inserted after the conversation has transitioned to READ_ONLY.
+  const [endConnRes, racingSendRes] = await Promise.all([
+    fetch(`${API_BASE}/connections/${requestId}/end`, {
+      method: 'POST',
+      headers: { Cookie: investorCookie },
+    }),
+    fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: founderCookie },
+      body: JSON.stringify({ messageBody: 'Message racing connection end.' }),
+    }),
+  ]);
   assert(endConnRes.status === 200, 'Connection ended by participant (200)');
+  assert(
+    racingSendRes.status === 201 || racingSendRes.status === 403,
+    'Concurrent send is either committed before ending or rejected after ending',
+  );
   const endJson = await endConnRes.json();
   assert(endJson.request.requestStatus === 'ENDED', 'Connection status is ENDED');
 
@@ -363,7 +431,11 @@ async function runTests() {
   });
   const retainedMsgsJson = await retainedMsgsRes.json();
   assert(retainedMsgsJson.conversationStatus === 'READ_ONLY', 'Conversation status is READ_ONLY');
-  assert(retainedMsgsJson.messages.length === 2, 'All historical messages retained after connection ended');
+  const expectedRetainedCount = 2 + (racingSendRes.status === 201 ? 1 : 0);
+  assert(
+    retainedMsgsJson.messages.length === expectedRetainedCount,
+    'Only messages committed before the connection ended are retained; the concurrent send is serialized',
+  );
 
   console.log('\n====================================================');
   console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);

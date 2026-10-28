@@ -9,6 +9,15 @@ type BoundedTextResult =
   | { ok: true; value: string | null }
   | { ok: false; error: string; message: string };
 
+function isMysqlDuplicateEntryError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'ER_DUP_ENTRY'
+  );
+}
+
 /**
  * Validates optional/required free-text input: must be a string, non-blank when required,
  * and no longer than maxLength (after trimming).
@@ -474,7 +483,17 @@ export async function createConnectionRequest(
       request,
     };
   } catch (err) {
-    await conn.rollback();
+    await conn.rollback().catch(() => undefined);
+    // uq_connection_request_active_pair is the final authority when concurrent
+    // requests race past the application-level existence check.
+    if (isMysqlDuplicateEntryError(err)) {
+      return {
+        success: false,
+        status: 409,
+        error: 'DUPLICATE_ACTIVE_REQUEST',
+        message: 'An active connection request or active relationship already exists between you and this founder.',
+      };
+    }
     console.error('Failed to create connection request:', err);
     return {
       success: false,
@@ -578,50 +597,78 @@ export async function respondToConnectionRequest(
   action: 'ACCEPT' | 'DECLINE',
   reason?: string,
 ): Promise<{ success: true; request: ConnectionRequestItem } | { success: false; status: number; error: string; message: string }> {
-  const req = await getConnectionRequestById(requestId);
-  if (!req) {
-    return {
-      success: false,
-      status: 404,
-      error: 'REQUEST_NOT_FOUND',
-      message: 'Connection request not found.',
-    };
-  }
-
-  // Security check: Only the recipient founder can accept or decline
-  if (req.founderUserId !== userId) {
-    return {
-      success: false,
-      status: 403,
-      error: 'UNAUTHORIZED_RECIPIENT',
-      message: 'Only the recipient founder of this connection request can respond to it.',
-    };
-  }
-
-  if (req.requestStatus !== 'PENDING') {
-    return {
-      success: false,
-      status: 400,
-      error: 'INVALID_STATE',
-      message: `Cannot respond to a request with status ${req.requestStatus}.`,
-    };
-  }
-
   const conn = await dbPool.getConnection();
   try {
     await conn.beginTransaction();
 
+    // Lock and re-read inside the transaction so concurrent decisions cannot
+    // both act on a stale PENDING state.
+    const [requestRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT
+         request_id AS requestId,
+         investor_user_id AS investorUserId,
+         founder_user_id AS founderUserId,
+         request_status AS requestStatus,
+         initial_message AS initialMessage
+       FROM connection_request
+       WHERE request_id = ?
+       FOR UPDATE`,
+      [requestId],
+    );
+
+    if (requestRows.length === 0) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 404,
+        error: 'REQUEST_NOT_FOUND',
+        message: 'Connection request not found.',
+      };
+    }
+
+    const request = requestRows[0];
+
+    // Security check is made against the locked, current row.
+    if (Number(request.founderUserId) !== Number(userId)) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 403,
+        error: 'UNAUTHORIZED_RECIPIENT',
+        message: 'Only the recipient founder of this connection request can respond to it.',
+      };
+    }
+
+    if (request.requestStatus !== 'PENDING') {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 400,
+        error: 'INVALID_STATE',
+        message: `Cannot respond to a request with status ${request.requestStatus}.`,
+      };
+    }
+
     if (action === 'ACCEPT') {
-      // 1. Update request status to ACCEPTED
-      await conn.execute(
+      const [updated] = await conn.execute<ResultSetHeader>(
         `UPDATE connection_request
          SET request_status = 'ACCEPTED',
              responded_at = CURRENT_TIMESTAMP
-         WHERE request_id = ?`,
+         WHERE request_id = ? AND request_status = 'PENDING'`,
         [requestId],
       );
 
-      // 2. Open conversation
+      if (updated.affectedRows !== 1) {
+        await conn.rollback();
+        return {
+          success: false,
+          status: 409,
+          error: 'INVALID_STATE',
+          message: 'The request was already handled. Refresh the connections list and try again.',
+        };
+      }
+
+      // The unique uq_conversation_request key is a second line of defence.
       const [convRes] = await conn.execute<ResultSetHeader>(
         `INSERT INTO conversation (request_id, conversation_status, created_at)
          VALUES (?, 'OPEN', CURRENT_TIMESTAMP)`,
@@ -629,36 +676,57 @@ export async function respondToConnectionRequest(
       );
 
       const conversationId = convRes.insertId;
-
-      // 3. If there was an initial message, record it in the message table
-      if (req.initialMessage && req.initialMessage.trim()) {
+      if (typeof request.initialMessage === 'string' && request.initialMessage.trim()) {
         await conn.execute(
           `INSERT INTO message (conversation_id, sender_user_id, message_body, created_at)
            VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-          [conversationId, req.investorUserId, req.initialMessage.trim()],
+          [conversationId, Number(request.investorUserId), request.initialMessage.trim()],
         );
       }
     } else {
-      // Decline request
-      await conn.execute(
+      const [updated] = await conn.execute<ResultSetHeader>(
         `UPDATE connection_request
          SET request_status = 'DECLINED',
              responded_at = CURRENT_TIMESTAMP,
              status_reason = ?
-         WHERE request_id = ?`,
+         WHERE request_id = ? AND request_status = 'PENDING'`,
         [reason?.trim() || null, requestId],
       );
+
+      if (updated.affectedRows !== 1) {
+        await conn.rollback();
+        return {
+          success: false,
+          status: 409,
+          error: 'INVALID_STATE',
+          message: 'The request was already handled. Refresh the connections list and try again.',
+        };
+      }
     }
 
     await conn.commit();
 
-    const updated = await getConnectionRequestById(requestId);
-    return {
-      success: true,
-      request: updated!,
-    };
+    const updatedRequest = await getConnectionRequestById(requestId);
+    if (!updatedRequest) {
+      return {
+        success: false,
+        status: 500,
+        error: 'SERVER_ERROR',
+        message: 'The request was updated, but its current state could not be retrieved.',
+      };
+    }
+
+    return { success: true, request: updatedRequest };
   } catch (err) {
-    await conn.rollback();
+    await conn.rollback().catch(() => undefined);
+    if (isMysqlDuplicateEntryError(err)) {
+      return {
+        success: false,
+        status: 409,
+        error: 'INVALID_STATE',
+        message: 'This request already has a conversation or has already been handled.',
+      };
+    }
     console.error('Failed to respond to connection request:', err);
     return {
       success: false,
@@ -675,66 +743,106 @@ export async function endConnection(
   userId: number,
   requestId: number,
 ): Promise<{ success: true; request: ConnectionRequestItem } | { success: false; status: number; error: string; message: string }> {
-  const req = await getConnectionRequestById(requestId);
-  if (!req) {
-    return {
-      success: false,
-      status: 404,
-      error: 'REQUEST_NOT_FOUND',
-      message: 'Connection not found.',
-    };
-  }
-
-  // Security check: Must be one of the two participants
-  if (req.investorUserId !== userId && req.founderUserId !== userId) {
-    return {
-      success: false,
-      status: 403,
-      error: 'UNAUTHORIZED_PARTICIPANT',
-      message: 'You are not a participant in this connection.',
-    };
-  }
-
-  if (req.requestStatus !== 'ACCEPTED') {
-    return {
-      success: false,
-      status: 400,
-      error: 'NOT_ACTIVE',
-      message: 'Only active accepted connections can be ended.',
-    };
-  }
-
   const conn = await dbPool.getConnection();
   try {
     await conn.beginTransaction();
 
-    // 1. Update connection_request to ENDED with ended_at
-    await conn.execute(
+    // Lock the request and re-check its state in this transaction. A concurrent
+    // end operation will wait here and then observe that the request is no longer ACCEPTED.
+    const [requestRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT
+         request_id AS requestId,
+         investor_user_id AS investorUserId,
+         founder_user_id AS founderUserId,
+         request_status AS requestStatus
+       FROM connection_request
+       WHERE request_id = ?
+       FOR UPDATE`,
+      [requestId],
+    );
+
+    if (requestRows.length === 0) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 404,
+        error: 'REQUEST_NOT_FOUND',
+        message: 'Connection not found.',
+      };
+    }
+
+    const request = requestRows[0];
+    if (Number(request.investorUserId) !== Number(userId) && Number(request.founderUserId) !== Number(userId)) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 403,
+        error: 'UNAUTHORIZED_PARTICIPANT',
+        message: 'You are not a participant in this connection.',
+      };
+    }
+
+    if (request.requestStatus !== 'ACCEPTED') {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 400,
+        error: 'NOT_ACTIVE',
+        message: 'Only active accepted connections can be ended.',
+      };
+    }
+
+    const [requestUpdate] = await conn.execute<ResultSetHeader>(
       `UPDATE connection_request
        SET request_status = 'ENDED',
            ended_at = CURRENT_TIMESTAMP
-       WHERE request_id = ?`,
+       WHERE request_id = ? AND request_status = 'ACCEPTED'`,
       [requestId],
     );
+    if (requestUpdate.affectedRows !== 1) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 409,
+        error: 'NOT_ACTIVE',
+        message: 'This connection has already ended. Refresh the connections list.',
+      };
+    }
 
-    // 2. Update conversation to READ_ONLY with closed_at
-    await conn.execute(
+    // Updating the conversation in the same transaction serializes with sendChatMessage,
+    // which locks this conversation row before checking its status and inserting a message.
+    const [conversationUpdate] = await conn.execute<ResultSetHeader>(
       `UPDATE conversation
        SET conversation_status = 'READ_ONLY',
            closed_at = CURRENT_TIMESTAMP
-       WHERE request_id = ?`,
+       WHERE request_id = ? AND conversation_status = 'OPEN'`,
       [requestId],
     );
+    if (conversationUpdate.affectedRows !== 1) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 409,
+        error: 'CONVERSATION_NOT_OPEN',
+        message: 'The conversation is missing or has already been closed. No connection changes were saved.',
+      };
+    }
 
     await conn.commit();
 
-    const updated = await getConnectionRequestById(requestId);
-    return {
-      success: true,
-      request: updated!,
-    };
+    const updatedRequest = await getConnectionRequestById(requestId);
+    if (!updatedRequest) {
+      return {
+        success: false,
+        status: 500,
+        error: 'SERVER_ERROR',
+        message: 'The connection was ended, but its current state could not be retrieved.',
+      };
+    }
+
+    return { success: true, request: updatedRequest };
   } catch (err) {
-    await conn.rollback();
+    await conn.rollback().catch(() => undefined);
     console.error('Failed to end connection:', err);
     return {
       success: false,
@@ -878,75 +986,109 @@ export async function sendChatMessage(
   }
   const trimmed = bodyCheck.value;
 
-  // Lookup conversation and verify participant authorization
-  const [convRows] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT
-       c.conversation_id AS conversationId,
-       c.conversation_status AS conversationStatus,
-       cr.investor_user_id AS investorUserId,
-       cr.founder_user_id AS founderUserId
-     FROM conversation c
-     INNER JOIN connection_request cr ON cr.request_id = c.request_id
-     WHERE c.conversation_id = ?`,
-    [conversationId],
-  );
+  const conn = await dbPool.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  if (convRows.length === 0) {
+    // This row lock is shared with endConnection's conversation status update.
+    // Consequently a send either commits before ending, or sees READ_ONLY afterwards.
+    const [conversationRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT conversation_id AS conversationId,
+              request_id AS requestId,
+              conversation_status AS conversationStatus
+       FROM conversation
+       WHERE conversation_id = ?
+       FOR UPDATE`,
+      [conversationId],
+    );
+
+    if (conversationRows.length === 0) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 404,
+        error: 'CONVERSATION_NOT_FOUND',
+        message: 'Conversation not found.',
+      };
+    }
+
+    const conversation = conversationRows[0];
+    const [requestRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT investor_user_id AS investorUserId,
+              founder_user_id AS founderUserId
+       FROM connection_request
+       WHERE request_id = ?`,
+      [conversation.requestId],
+    );
+
+    if (requestRows.length === 0) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 404,
+        error: 'CONVERSATION_NOT_FOUND',
+        message: 'Conversation not found.',
+      };
+    }
+
+    const request = requestRows[0];
+    const isInvestor = Number(request.investorUserId) === Number(userId);
+    const isFounder = Number(request.founderUserId) === Number(userId);
+    if (!isInvestor && !isFounder) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 403,
+        error: 'UNAUTHORIZED_SENDER',
+        message: 'You are not a participant in this conversation.',
+      };
+    }
+
+    if (conversation.conversationStatus !== 'OPEN') {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 403,
+        error: 'CONVERSATION_READ_ONLY',
+        message: 'This connection has ended. Conversation is preserved in read-only mode and new messages cannot be sent.',
+      };
+    }
+
+    const [insertResult] = await conn.execute<ResultSetHeader>(
+      `INSERT INTO message (conversation_id, sender_user_id, message_body, created_at)
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+      [conversationId, userId, trimmed],
+    );
+
+    const [userRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT full_name FROM app_user WHERE user_id = ?`,
+      [userId],
+    );
+
+    await conn.commit();
+
+    return {
+      success: true,
+      message: {
+        messageId: insertResult.insertId,
+        conversationId,
+        senderUserId: userId,
+        senderName: userRows[0]?.full_name || 'User',
+        senderRole: isInvestor ? 'INVESTOR' : 'FOUNDER',
+        messageBody: trimmed,
+        createdAt: new Date().toISOString(),
+      },
+    };
+  } catch (err) {
+    await conn.rollback().catch(() => undefined);
+    console.error('Failed to send chat message:', err);
     return {
       success: false,
-      status: 404,
-      error: 'CONVERSATION_NOT_FOUND',
-      message: 'Conversation not found.',
+      status: 500,
+      error: 'SERVER_ERROR',
+      message: 'Failed to send message.',
     };
+  } finally {
+    conn.release();
   }
-
-  const row = convRows[0];
-  const isInvestor = row.investorUserId === userId;
-  const isFounder = row.founderUserId === userId;
-
-  if (!isInvestor && !isFounder) {
-    return {
-      success: false,
-      status: 403,
-      error: 'UNAUTHORIZED_SENDER',
-      message: 'You are not a participant in this conversation.',
-    };
-  }
-
-  // Security check: cannot send message in ended/read-only conversation
-  if (row.conversationStatus === 'READ_ONLY') {
-    return {
-      success: false,
-      status: 403,
-      error: 'CONVERSATION_READ_ONLY',
-      message: 'This connection has ended. Conversation is preserved in read-only mode and new messages cannot be sent.',
-    };
-  }
-
-  const [insertResult] = await dbPool.execute<ResultSetHeader>(
-    `INSERT INTO message (conversation_id, sender_user_id, message_body, created_at)
-     VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-    [conversationId, userId, trimmed],
-  );
-
-  const messageId = insertResult.insertId;
-
-  // Retrieve user name
-  const [userRows] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT full_name FROM app_user WHERE user_id = ?`,
-    [userId],
-  );
-
-  return {
-    success: true,
-    message: {
-      messageId,
-      conversationId,
-      senderUserId: userId,
-      senderName: userRows[0]?.full_name || 'User',
-      senderRole: isInvestor ? 'INVESTOR' : 'FOUNDER',
-      messageBody: trimmed,
-      createdAt: new Date().toISOString(),
-    },
-  };
 }
