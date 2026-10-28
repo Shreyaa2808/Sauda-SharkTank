@@ -1,46 +1,25 @@
 import { dbPool } from './db.js';
 import { signSession } from './auth.js';
 import type { RowDataPacket } from 'mysql2';
+import { assertIntegrationTargetSafe, verifyConnectedDatabase } from './testSafetyGuards.js';
 
-const API_BASE = (process.env.SAUDA_TEST_API_BASE ?? '').trim();
-const integrationApiUrl = (() => {
-  try {
-    return API_BASE ? new URL(API_BASE) : null;
-  } catch {
-    return null;
-  }
-})();
-const safeApiTarget =
-  integrationApiUrl !== null &&
-  integrationApiUrl.protocol === 'http:' &&
-  ['localhost', '127.0.0.1'].includes(integrationApiUrl.hostname) &&
-  integrationApiUrl.port !== '' &&
-  integrationApiUrl.port !== '4000' &&
-  integrationApiUrl.pathname === '/api' &&
-  !integrationApiUrl.username &&
-  !integrationApiUrl.password &&
-  !integrationApiUrl.search &&
-  !integrationApiUrl.hash;
-
-// This suite creates users, pitches, requests, conversations and messages. Require
-// an explicit opt-in and a local disposable database before making any requests.
-const integrationDbName = (process.env.DB_NAME ?? '').trim();
-const integrationDbHost = (process.env.DB_HOST ?? '').trim().toLowerCase();
-const integrationTestEnabled = process.env.SAUDA_RUN_WORKSPACE_SECURITY_TESTS === '1';
-const localDbHost = ['localhost', '127.0.0.1', '::1'].includes(integrationDbHost);
-const disposableDbName = /^sauda_test_[a-z0-9_]+$/i.test(integrationDbName);
-if (!integrationTestEnabled || !localDbHost || !disposableDbName || !safeApiTarget) {
-  console.error(
-    '[REFUSED] Require explicit opt-in, a local sauda_test_* database, and SAUDA_TEST_API_BASE pointing to a local /api URL on a port other than 4000.',
-  );
+let safeTarget: { dbName: string; apiUrl?: string };
+try {
+  safeTarget = assertIntegrationTargetSafe({
+    optInEnvVar: 'SAUDA_RUN_WORKSPACE_SECURITY_TESTS',
+    requireApiUrl: true,
+  });
+} catch {
   process.exit(1);
 }
+const API_BASE = safeTarget.apiUrl!;
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function runTests() {
+  await verifyConnectedDatabase(dbPool, safeTarget.dbName);
   console.log('====================================================');
   console.log('SAUDA BACKEND WORKSPACE & SECURITY INTEGRATION SUITE');
   console.log('====================================================\n');
@@ -173,9 +152,24 @@ async function runTests() {
   });
   assert(intruderFounderRes.status === 403, 'Intruder without FOUNDER role rejected (403)');
 
-  // A valid stage is required before a pitch can be submitted for review
+  // A valid industry and stage are required before a pitch can be submitted for review
+  const [indRows] = await dbPool.execute<RowDataPacket[]>(`SELECT industry_id FROM industry ORDER BY industry_id LIMIT 1`);
+  let testIndustryId: number;
+  if (indRows.length === 0) {
+    const [indRes] = await dbPool.execute<any>(`INSERT INTO industry (industry_name) VALUES ('Test Industry')`);
+    testIndustryId = indRes.insertId;
+  } else {
+    testIndustryId = Number(indRows[0].industry_id);
+  }
+
   const [stageRows] = await dbPool.execute<RowDataPacket[]>(`SELECT stage_id FROM startup_stage ORDER BY stage_id LIMIT 1`);
-  const testStageId = Number(stageRows[0]?.stage_id ?? 1);
+  let testStageId: number;
+  if (stageRows.length === 0) {
+    const [stgRes] = await dbPool.execute<any>(`INSERT INTO startup_stage (stage_name) VALUES ('Test Stage')`);
+    testStageId = stgRes.insertId;
+  } else {
+    testStageId = Number(stageRows[0].stage_id);
+  }
 
   // Founder create pitch (DRAFT)
   const createDraftRes = await fetch(`${API_BASE}/founder/pitches`, {
@@ -184,7 +178,7 @@ async function runTests() {
     body: JSON.stringify({
       brandName: 'Quantum Solar Tech',
       legalBusinessName: 'Quantum Solar Private Limited',
-      industryId: 4, // Sustainable Packaging / Clean Energy
+      industryId: testIndustryId,
       stageId: testStageId,
       pitchHook: 'Next-generation solid-state solar thermal cells with 42% efficiency.',
       businessModel: 'B2B Enterprise',
@@ -195,6 +189,9 @@ async function runTests() {
       pitchStatus: 'DRAFT',
     }),
   });
+  if (createDraftRes.status !== 201) {
+    console.error('createDraftRes failed:', createDraftRes.status, await createDraftRes.clone().json());
+  }
   assert(createDraftRes.status === 201, 'Founder created DRAFT pitch (201)');
   const createDraftJson = await createDraftRes.json();
   const testPitchId = createDraftJson.pitchId;

@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import type { Pool, PoolConnection } from 'mysql2/promise';
+import { parsePagination } from './validation.js';
 
 export const MIN_REJECTION_NOTE_LENGTH = 10;
 export const MAX_REVIEW_NOTE_LENGTH = 2000;
@@ -203,11 +204,27 @@ const HISTORY_QUERY = `
   FROM pitch_review_event e
   INNER JOIN app_user reviewer ON reviewer.user_id = e.reviewer_user_id`;
 
-export async function getAdminReviewQueue(pool: Pool): Promise<AdminReviewPitch[]> {
+export async function getAdminReviewQueue(
+  pool: Pool,
+  pagination?: { limit?: unknown; offset?: unknown },
+): Promise<AdminReviewPitch[]> {
+  let limitClause = '';
+  const params: number[] = [];
+
+  if (pagination && (pagination.limit !== undefined || pagination.offset !== undefined)) {
+    const { limit, offset } = parsePagination(pagination as Record<string, unknown>, {
+      defaultLimit: 50,
+      maxLimit: 100,
+    });
+    limitClause = ' LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+  }
+
   const [rows] = await pool.execute<AdminReviewPitch[]>(
     `${PITCH_COLUMNS}
      WHERE p.pitch_type = 'PLATFORM' AND p.pitch_status = 'SUBMITTED'
-     ORDER BY p.submitted_at ASC, p.pitch_id ASC`,
+     ORDER BY p.submitted_at ASC, p.pitch_id ASC${limitClause}`,
+    params,
   );
   return rows;
 }

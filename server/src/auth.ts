@@ -181,12 +181,19 @@ export function getSessionFromRequest(req: Request): SessionPayload | null {
   return verifySession(token);
 }
 
+export interface VerifyGoogleTokenOptions {
+  timeoutMs?: number;
+  fetchFn?: typeof fetch;
+}
+
 /**
  * Verify Google ID Token server-side via Google's tokeninfo API.
  * Validates signature, expiry, expected audience (GOOGLE_CLIENT_ID), issuer, valid subject, and email verification.
+ * Enforces bounded network timeout and redacts sensitive credentials from log output.
  */
 export async function verifyGoogleIdToken(
   idToken: string,
+  options: VerifyGoogleTokenOptions = {},
 ): Promise<
   | { success: true; profile: GoogleVerifiedProfile }
   | { success: false; status: number; error: string; message: string }
@@ -211,11 +218,28 @@ export async function verifyGoogleIdToken(
     };
   }
 
+  const timeoutMs = options.timeoutMs ?? (Number(process.env.GOOGLE_OAUTH_TIMEOUT_MS) || 5000);
+  const fetchFn = options.fetchFn ?? fetch;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new Error('Google token verification request timed out.'));
+  }, timeoutMs);
+
   try {
     const tokenInfoUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
-    const response = await fetch(tokenInfoUrl);
+    const response = await fetchFn(tokenInfoUrl, { signal: controller.signal });
+    clearTimeout(timer);
 
     if (!response.ok) {
+      if (response.status >= 500) {
+        return {
+          success: false,
+          status: 502,
+          error: 'GOOGLE_OAUTH_UNAVAILABLE',
+          message: 'Google authentication service is currently unreachable. Please try again later.',
+        };
+      }
       return {
         success: false,
         status: 401,
@@ -302,8 +326,25 @@ export async function verifyGoogleIdToken(
         picture,
       },
     };
-  } catch (err) {
-    console.error('Error contacting Google token verification service:', err);
+  } catch (err: any) {
+    clearTimeout(timer);
+    const isTimeout =
+      err?.name === 'TimeoutError' ||
+      err?.name === 'AbortError' ||
+      err?.code === 'ABORT_ERR' ||
+      controller.signal.aborted;
+
+    if (isTimeout) {
+      return {
+        success: false,
+        status: 504,
+        error: 'GOOGLE_OAUTH_TIMEOUT',
+        message: 'Google token verification service timed out. Please try again.',
+      };
+    }
+
+    // Never log raw tokens, payload details, or secrets
+    console.error('[Auth] Error contacting Google token verification service:', err?.message || 'Network error');
     return {
       success: false,
       status: 502,
@@ -380,7 +421,7 @@ export async function authenticateOrProvisionGoogleUser(
       error: 'ACCOUNT_LINKING_REQUIRED',
       message:
         'An existing Sauda account is already registered with this email address. ' +
-        'For security, automatic linking is disabled. Please sign in with your password or contact support to connect Google Sign-In.',
+        'For security, automatic account linking is disabled. Please contact the administrator or support team at support@sauda.internal to securely link your Google account.',
     };
   }
 
@@ -544,7 +585,7 @@ export async function getUserProfile(userId: number): Promise<UserProfile | null
  */
 export async function updateUserProfile(
   userId: number,
-  data: { fullName: string; phoneNumber: string | null },
+  data: { fullName: string; phoneNumber?: string | null },
 ): Promise<{ success: true; user: UserProfile } | { success: false; status: number; error: string; message: string }> {
   const trimmedName = (data.fullName || '').trim();
   if (!trimmedName || trimmedName.length > 100) {
@@ -556,30 +597,46 @@ export async function updateUserProfile(
     };
   }
 
-  let cleanPhone: string | null = null;
-  if (data.phoneNumber && typeof data.phoneNumber === 'string') {
-    const trimmedPhone = data.phoneNumber.trim();
-    if (trimmedPhone.length > 0) {
-      const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{5,20}$/;
-      if (!phoneRegex.test(trimmedPhone) || trimmedPhone.length > 25) {
-        return {
-          success: false,
-          status: 400,
-          error: 'INVALID_PHONE',
-          message: 'Please provide a valid phone number format (e.g., +91 98765 43210).',
-        };
+  let cleanPhone: string | null | undefined = undefined;
+  if (Object.prototype.hasOwnProperty.call(data, 'phoneNumber')) {
+    if (data.phoneNumber === null) {
+      cleanPhone = null;
+    } else if (typeof data.phoneNumber === 'string') {
+      const trimmedPhone = data.phoneNumber.trim();
+      if (trimmedPhone.length > 0) {
+        const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{5,20}$/;
+        if (!phoneRegex.test(trimmedPhone) || trimmedPhone.length > 25) {
+          return {
+            success: false,
+            status: 400,
+            error: 'INVALID_PHONE',
+            message: 'Please provide a valid phone number format (e.g., +91 98765 43210).',
+          };
+        }
+        cleanPhone = trimmedPhone;
+      } else {
+        cleanPhone = null;
       }
-      cleanPhone = trimmedPhone;
+    } else {
+      return {
+        success: false,
+        status: 400,
+        error: 'INVALID_PHONE',
+        message: 'phoneNumber must be a valid phone string or null.',
+      };
     }
   }
 
-  const [result] = await dbPool.execute<ResultSetHeader>(
-    `UPDATE app_user
-     SET full_name = ?,
-         phone_number = ?
-     WHERE user_id = ? AND account_status = 'ACTIVE'`,
-    [trimmedName, cleanPhone, userId],
-  );
+  const updatePhone = cleanPhone !== undefined;
+  const [result] = updatePhone
+    ? await dbPool.execute<ResultSetHeader>(
+        `UPDATE app_user SET full_name = ?, phone_number = ? WHERE user_id = ? AND account_status = 'ACTIVE'`,
+        [trimmedName, cleanPhone ?? null, userId],
+      )
+    : await dbPool.execute<ResultSetHeader>(
+        `UPDATE app_user SET full_name = ? WHERE user_id = ? AND account_status = 'ACTIVE'`,
+        [trimmedName, userId],
+      );
 
   if (result.affectedRows === 0) {
     return {

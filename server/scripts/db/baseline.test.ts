@@ -223,3 +223,31 @@ test('reference seed: role names only, no ids, no other tables, no users', () =>
   const seed = stripSqlComments(read('database/baseline/002_reference_seed.sql'));
   assert.match(seed, /^\s*INSERT IGNORE INTO app_role \(role_name\) VALUES\s*\('VIEWER'\),\s*\('FOUNDER'\),\s*\('INVESTOR'\),\s*\('ADMIN'\);\s*$/);
 });
+
+
+test('runtime baseline loader records BASELINE_INFO migrations as BASELINED after loading schema', () => {
+  const loader = read('server/scripts/db/create_test_db.ts');
+  assert.match(loader, /BASELINE_INFO_PATH/);
+  assert.match(loader, /planBaselineMarks\(baselineInfo, migrations\)/);
+  assert.match(loader, /schema_migrations/);
+  assert.match(loader, /'BASELINED'/);
+  assert.match(loader, /migration\.checksum/);
+  assert.ok(loader.indexOf("await conn.query(fs.readFileSync(path.join(BASELINE_DIR, f), 'utf8'))") < loader.indexOf("await conn.query(fs.readFileSync(TRACKING_SQL_PATH, 'utf8'))"));
+});
+
+test('real BASELINE_INFO marks included migrations and prevents re-running baseline DDL', () => {
+  const info = JSON.parse(read('database/baseline/BASELINE_INFO.json')) as unknown;
+  const migrations = loadMigrations(path.join(root, 'database/migrations'));
+  const marked = planBaselineMarks(info, migrations);
+  assert.deepEqual(marked.map((migration) => migration.version), ['001']);
+
+  const applied = marked.map((migration) => ({
+    version: migration.version,
+    checksum_sha256: migration.checksum,
+    status: 'BASELINED' as const,
+  }));
+  const plan = planMigrations(migrations, applied);
+  assert.deepEqual(plan.problems, []);
+  assert.equal(plan.pending.some((migration) => migration.version === '001'), false);
+  assert.deepEqual(plan.pending.map((migration) => migration.version), ['004']);
+});

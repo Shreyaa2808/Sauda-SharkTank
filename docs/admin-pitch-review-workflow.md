@@ -1,4 +1,4 @@
-# Sauda Phase 3 — Admin pitch review workflow
+# Sauda Phase 2 — Admin pitch review and moderation workflow
 
 ## Scope
 
@@ -18,6 +18,9 @@ This phase adds a protected queue for submitted `PLATFORM` pitches, Admin publis
 - `GET /api/admin/reviews/:pitchId` — Admin-only; returns platform pitch details and review history.
 - `POST /api/admin/reviews/:pitchId/decision` — Admin-only; body: `{ "decision": "PUBLISH" | "REJECT", "note": "..." }`.
 - `GET /api/founder/pitches/:pitchId/reviews` — Founder-only; returns history only when the pitch is a platform pitch owned by the authenticated founder. Non-owned, nonexistent, and `SHOW` pitches return the same `404` response to avoid disclosure.
+- `PUT /api/admin/platform-pitches/:pitchId` — Admin-only correction of a PLATFORM listing while preserving status; status changes are rejected and handled through separate review/archive operations.
+- `POST /api/admin/platform-pitches/:pitchId/archive` — Admin-only soft archive; existing connection requests are withdrawn/ended consistently and conversation history is retained read-only.
+- `POST /api/admin/users/:userId/roles` — Admin-only grant/revoke, audit logged; prevents revoking the last active Admin and provisions role-specific profile rows when granting Founder/Investor.
 
 Every Admin route uses the server-side session and database-derived `ADMIN` role. Frontend role visibility is only a convenience and is not authorization.
 
@@ -81,4 +84,4 @@ Founders can read review history for their own `PLATFORM` pitches only. The UI e
 
 ## Verification status
 
-Unit tests cover pure input validation, role authorization decisions, state-transition rules, and rejection-note requirements. Database-backed authorization, migration execution, rollback behavior, and true concurrent requests still require an isolated MySQL integration test. No migration is applied by this patch.
+Unit tests cover pure input validation, role authorization decisions, state-transition rules, and rejection-note requirements. A guarded MySQL integration suite now exists at `server/src/adminReview.integration.test.ts`; it verifies queue/detail/history, publish decision persistence, rollback when the reviewer foreign key fails, and concurrent publish/reject decisions. It requires migration 004 to be recorded `APPLIED` on a local disposable `sauda_test_*` database and must be run using the command in `docs/phase2-admin-review-and-moderation.md`. That DB-backed suite was not run in the packaging environment. No migration is applied automatically, and migration 004 remains a draft pending schema preflight and explicit approval.

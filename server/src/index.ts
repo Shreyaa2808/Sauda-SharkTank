@@ -25,6 +25,7 @@ import {
   createConnectionRequest,
   getUserConnections,
   respondToConnectionRequest,
+  withdrawConnectionRequest,
   endConnection,
   getConversationMessages,
   sendChatMessage,
@@ -45,6 +46,45 @@ import {
   getFounderPitchReviewHistory,
   parseReviewDecisionInput,
 } from './adminReview.js';
+
+import {
+  getFounderRoleProfile,
+  getInvestorRoleProfile,
+  updateFounderRoleProfile,
+  updateInvestorRoleProfile,
+} from './roleProfiles.js';
+import {
+  HistoricalServiceError,
+  assignHistoricalEpisodeSharkSeat,
+  removeHistoricalEpisodeSharkSeat,
+  compareStartups,
+  createHistoricalEpisode,
+  createHistoricalOffer,
+  createHistoricalPitch,
+  createHistoricalSeason,
+  createHistoricalShark,
+  deleteHistoricalEpisode,
+  deleteHistoricalOffer,
+  deleteHistoricalPitch,
+  deleteHistoricalSeason,
+  deleteHistoricalShark,
+  deleteHistoricalDeal,
+  getHistoricalEpisodeDetail,
+  getHistoricalImportReport,
+  getHistoricalStatistics,
+  importHistoricalPitchesCsv,
+  listHistoricalImportReports,
+  listHistoricalEpisodes,
+  listHistoricalSeasons,
+  listHistoricalSharks,
+  searchHistoricalPitches,
+  updateHistoricalEpisode,
+  updateHistoricalOffer,
+  updateHistoricalPitch,
+  updateHistoricalSeason,
+  updateHistoricalShark,
+  upsertHistoricalDeal,
+} from './historical.js';
 
 // Fail closed: refuse to boot without a strong, non-placeholder AUTH_SESSION_SECRET.
 try {
@@ -102,6 +142,13 @@ app.get('/api/health/db', async (_req, res) => {
  * provisions or authenticates user with default VIEWER role, and issues signed HttpOnly session cookie.
  */
 app.post('/api/auth/google', async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({
+      error: 'INVALID_BODY',
+      message: 'A JSON object is required.',
+    });
+    return;
+  }
   const { credential } = req.body;
 
   if (!credential || typeof credential !== 'string') {
@@ -211,6 +258,27 @@ app.post('/api/auth/logout', (_req, res) => {
   });
 });
 
+import {
+  ValidationError,
+  parsePositiveIntegerId,
+  parsePagination,
+  validateJsonObject,
+} from './validation.js';
+
+// Common error mapping for schema-backed historical data services.
+function sendHistoricalError(res: express.Response, error: unknown, fallback: string) {
+  if (error instanceof ValidationError) {
+    res.status(error.status).json({ error: error.code, message: error.message });
+    return;
+  }
+  if (error instanceof HistoricalServiceError) {
+    res.status(error.status).json({ error: error.code, message: error.message });
+    return;
+  }
+  console.error(fallback, error);
+  res.status(500).json({ error: 'SERVER_ERROR', message: fallback });
+}
+
 // ============================================================================
 // USER PROFILE & ACCOUNT ENDPOINTS
 // ============================================================================
@@ -269,6 +337,10 @@ app.put('/api/user/profile', async (req, res) => {
     return;
   }
 
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object is required.' });
+    return;
+  }
   const { fullName, phoneNumber } = req.body;
   if (typeof fullName !== 'string') {
     res.status(400).json({
@@ -278,10 +350,15 @@ app.put('/api/user/profile', async (req, res) => {
     return;
   }
 
+  if (phoneNumber !== undefined && phoneNumber !== null && typeof phoneNumber !== 'string') {
+    res.status(400).json({ error: 'INVALID_PHONE', message: 'phoneNumber must be a string or null.' });
+    return;
+  }
+
   try {
     const result = await updateUserProfile(session.userId, {
       fullName,
-      phoneNumber: typeof phoneNumber === 'string' || phoneNumber === null ? phoneNumber : null,
+      ...(phoneNumber !== undefined ? { phoneNumber } : {}),
     });
 
     if (!result.success) {
@@ -348,6 +425,50 @@ async function requireAuthAndRole(
 }
 
 // ============================================================================
+// ROLE-SPECIFIC PROFILE ENDPOINTS
+// ============================================================================
+
+app.get('/api/founder/profile', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['FOUNDER']);
+  if (!user) return;
+  try {
+    const result = await getFounderRoleProfile(user.userId);
+    if (!result.success) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
+    res.status(200).json({ ok: true, profile: result.data });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to load Founder profile.'); }
+});
+
+app.put('/api/founder/profile', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['FOUNDER']);
+  if (!user) return;
+  try {
+    const result = await updateFounderRoleProfile(user.userId, req.body);
+    if (!result.success) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
+    res.status(200).json({ ok: true, profile: result.data, message: 'Founder profile updated.' });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to update Founder profile.'); }
+});
+
+app.get('/api/investor/profile', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['INVESTOR']);
+  if (!user) return;
+  try {
+    const result = await getInvestorRoleProfile(user.userId);
+    if (!result.success) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
+    res.status(200).json({ ok: true, profile: result.data });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to load Investor profile.'); }
+});
+
+app.put('/api/investor/profile', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['INVESTOR']);
+  if (!user) return;
+  try {
+    const result = await updateInvestorRoleProfile(user.userId, req.body);
+    if (!result.success) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
+    res.status(200).json({ ok: true, profile: result.data, message: 'Investor profile updated.' });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to update Investor profile.'); }
+});
+
+// ============================================================================
 // ROLE ONBOARDING & ACTIVATION ENDPOINTS
 // ============================================================================
 
@@ -359,6 +480,11 @@ async function requireAuthAndRole(
 app.post('/api/user/roles/activate', async (req, res) => {
   const user = await requireAuthAndRole(req, res);
   if (!user) return;
+
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object is required.' });
+    return;
+  }
 
   const { role } = req.body;
   if (!role || typeof role !== 'string') {
@@ -398,6 +524,10 @@ app.post('/api/user/roles/activate', async (req, res) => {
 // ============================================================================
 
 function sendReviewError(res: express.Response, error: unknown, fallbackMessage: string) {
+  if (error instanceof ValidationError) {
+    res.status(error.status).json({ error: error.code, message: error.message });
+    return;
+  }
   if (error instanceof AdminReviewError) {
     res.status(error.status).json({ error: error.code, message: error.message });
     return;
@@ -409,13 +539,17 @@ function sendReviewError(res: express.Response, error: unknown, fallbackMessage:
   });
 }
 
-/** GET /api/admin/reviews — eligible submitted PLATFORM pitches only. */
+/** GET /api/admin/reviews — eligible submitted PLATFORM pitches only with optional bounded pagination. */
 app.get('/api/admin/reviews', async (req, res) => {
   const user = await requireAuthAndRole(req, res, ['ADMIN']);
   if (!user) return;
   try {
-    const data = await getAdminReviewQueue(dbPool);
-    res.status(200).json({ ok: true, data });
+    const pagination =
+      req.query.limit !== undefined || req.query.offset !== undefined
+        ? parsePagination(req.query as Record<string, unknown>, { defaultLimit: 50, maxLimit: 100 })
+        : undefined;
+    const data = await getAdminReviewQueue(dbPool, pagination);
+    res.status(200).json({ ok: true, count: data.length, data });
   } catch (error) {
     sendReviewError(res, error, 'Failed to load the Admin review queue.');
   }
@@ -538,6 +672,11 @@ app.post('/api/founder/pitches', async (req, res) => {
   const user = await requireAuthAndRole(req, res, ['FOUNDER']);
   if (!user) return;
 
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON pitch object is required.' });
+    return;
+  }
+
   try {
     const result = await createFounderPitch(user.userId, req.body);
     if (!result.success) {
@@ -574,11 +713,16 @@ app.put('/api/founder/pitches/:pitchId', async (req, res) => {
   if (!user) return;
 
   const pitchId = Number(req.params.pitchId);
-  if (!Number.isInteger(pitchId) || pitchId < 1) {
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
     res.status(400).json({
       error: 'INVALID_PITCH_ID',
       message: 'Valid pitch ID required.',
     });
+    return;
+  }
+
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON pitch object is required.' });
     return;
   }
 
@@ -617,7 +761,7 @@ app.get('/api/founder/pitches/:pitchId', async (req, res) => {
   if (!user) return;
 
   const pitchId = Number(req.params.pitchId);
-  if (!Number.isInteger(pitchId) || pitchId < 1) {
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
     res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' });
     return;
   }
@@ -636,17 +780,71 @@ app.get('/api/founder/pitches/:pitchId', async (req, res) => {
 });
 
 /**
+ * PUT /api/admin/platform-pitches/:pitchId
+ * Admin correction of a PLATFORM listing while preserving its current status.
+ * The route deliberately rejects pitchStatus changes; review and archive use separate actions.
+ */
+app.put('/api/admin/platform-pitches/:pitchId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']);
+  if (!user) return;
+  const pitchId = Number(req.params.pitchId);
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
+    res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' }); return;
+  }
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON pitch object is required.' }); return;
+  }
+  if ('pitchStatus' in req.body) {
+    res.status(400).json({ error: 'ADMIN_STATUS_CHANGE_FORBIDDEN', message: 'Use the review-decision or archive endpoint to change a listing status.' }); return;
+  }
+  try {
+    const result = await updateFounderPitch(user.userId, pitchId, req.body, true);
+    if (!result.success) { res.status(result.status).json({ error: result.error, message: result.message, fieldErrors: result.fieldErrors }); return; }
+    res.status(200).json({ ok: true, pitch: result.pitch, message: 'Platform listing corrected by an administrator.' });
+  } catch (error) {
+    console.error('Admin platform listing correction failed:', error);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to correct platform listing.' });
+  }
+});
+
+/**
  * POST /api/founder/pitches/:pitchId/archive
  * Owner-only soft removal. Sets pitch_status = 'ARCHIVED', withdraws pending requests,
  * ends accepted connections and makes their conversations read-only. Nothing is deleted.
  * Requires FOUNDER role.
  */
+/**
+ * POST /api/admin/platform-pitches/:pitchId/archive
+ * Admin moderation soft-removes a PLATFORM listing and applies the same request/message
+ * lifecycle effects as owner archive. Historical SHOW records remain immutable.
+ */
+app.post('/api/admin/platform-pitches/:pitchId/archive', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']);
+  if (!user) return;
+  const pitchId = Number(req.params.pitchId);
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
+    res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' });
+    return;
+  }
+  try {
+    const result = await archiveFounderPitch(user.userId, pitchId, true);
+    if (!result.success) {
+      res.status(result.status).json({ error: result.error, message: result.message });
+      return;
+    }
+    res.status(200).json({ ok: true, pitch: result.pitch, summary: result.summary, message: 'Platform listing archived by an administrator.' });
+  } catch (err) {
+    console.error('Admin pitch archive error:', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to archive platform listing.' });
+  }
+});
+
 app.post('/api/founder/pitches/:pitchId/archive', async (req, res) => {
   const user = await requireAuthAndRole(req, res, ['FOUNDER']);
   if (!user) return;
 
   const pitchId = Number(req.params.pitchId);
-  if (!Number.isInteger(pitchId) || pitchId < 1) {
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
     res.status(400).json({ error: 'INVALID_PITCH_ID', message: 'Valid pitch ID required.' });
     return;
   }
@@ -742,8 +940,13 @@ app.post('/api/investor/watchlist/toggle', async (req, res) => {
   const user = await requireAuthAndRole(req, res, ['INVESTOR']);
   if (!user) return;
 
-  const pitchId = Number(req.body?.pitchId);
-  if (!Number.isInteger(pitchId) || pitchId < 1) {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object is required.' });
+    return;
+  }
+
+  const pitchId = Number(req.body.pitchId);
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
     res.status(400).json({
       error: 'INVALID_PITCH_ID',
       message: 'Valid pitch ID required.',
@@ -753,6 +956,10 @@ app.post('/api/investor/watchlist/toggle', async (req, res) => {
 
   try {
     const result = await toggleWatchlist(user.userId, pitchId);
+    if (!('saved' in result)) {
+      res.status(result.status).json({ error: result.error, message: result.message });
+      return;
+    }
     res.status(200).json({
       ok: true,
       saved: result.saved,
@@ -780,8 +987,13 @@ app.post('/api/connections/request', async (req, res) => {
   const user = await requireAuthAndRole(req, res, ['INVESTOR']);
   if (!user) return;
 
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object is required.' });
+    return;
+  }
+
   const pitchId = Number(req.body.pitchId);
-  if (!Number.isInteger(pitchId) || pitchId < 1) {
+  if (!Number.isSafeInteger(pitchId) || pitchId < 1) {
     res.status(400).json({
       error: 'INVALID_PITCH_ID',
       message: 'Valid pitch ID required.',
@@ -848,6 +1060,14 @@ app.post('/api/connections/:requestId/respond', async (req, res) => {
   if (!user) return;
 
   const requestId = Number(req.params.requestId);
+  if (!Number.isSafeInteger(requestId) || requestId < 1) {
+    res.status(400).json({ error: 'INVALID_REQUEST_ID', message: 'Valid request ID required.' });
+    return;
+  }
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object is required.' });
+    return;
+  }
   const action = req.body.action;
 
   if (action !== 'ACCEPT' && action !== 'DECLINE') {
@@ -883,6 +1103,35 @@ app.post('/api/connections/:requestId/respond', async (req, res) => {
 });
 
 /**
+ * POST /api/connections/:requestId/withdraw
+ * The requesting investor may withdraw their own pending request only.
+ */
+app.post('/api/connections/:requestId/withdraw', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['INVESTOR']);
+  if (!user) return;
+  const requestId = Number(req.params.requestId);
+  if (!Number.isSafeInteger(requestId) || requestId < 1) {
+    res.status(400).json({ error: 'INVALID_REQUEST_ID', message: 'Valid request ID required.' });
+    return;
+  }
+  if (req.body !== undefined && (!req.body || typeof req.body !== 'object' || Array.isArray(req.body))) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object is required.' });
+    return;
+  }
+  try {
+    const result = await withdrawConnectionRequest(user.userId, requestId, req.body?.reason);
+    if (!result.success) {
+      res.status(result.status).json({ error: result.error, message: result.message });
+      return;
+    }
+    res.status(200).json({ ok: true, request: result.request, message: 'Connection request withdrawn.' });
+  } catch (err) {
+    console.error('Withdraw connection request error:', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to withdraw connection request.' });
+  }
+});
+
+/**
  * POST /api/connections/:requestId/end
  * Either participant in an active connection can end it.
  */
@@ -891,6 +1140,10 @@ app.post('/api/connections/:requestId/end', async (req, res) => {
   if (!user) return;
 
   const requestId = Number(req.params.requestId);
+  if (!Number.isSafeInteger(requestId) || requestId < 1) {
+    res.status(400).json({ error: 'INVALID_REQUEST_ID', message: 'Valid request ID required.' });
+    return;
+  }
   try {
     const result = await endConnection(user.userId, requestId);
     if (!result.success) {
@@ -925,6 +1178,10 @@ app.get('/api/conversations/:conversationId/messages', async (req, res) => {
   if (!user) return;
 
   const conversationId = Number(req.params.conversationId);
+  if (!Number.isSafeInteger(conversationId) || conversationId < 1) {
+    res.status(400).json({ error: 'INVALID_CONVERSATION_ID', message: 'Valid conversation ID required.' });
+    return;
+  }
   try {
     const result = await getConversationMessages(user.userId, conversationId);
     if (!result.success) {
@@ -956,10 +1213,15 @@ app.post('/api/conversations/:conversationId/messages', async (req, res) => {
   const user = await requireAuthAndRole(req, res);
   if (!user) return;
 
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object is required.' });
+    return;
+  }
+
   const conversationId = Number(req.params.conversationId);
   const messageBody: unknown = req.body?.messageBody;
 
-  if (!Number.isInteger(conversationId) || conversationId < 1) {
+  if (!Number.isSafeInteger(conversationId) || conversationId < 1) {
     res.status(400).json({
       error: 'INVALID_CONVERSATION_ID',
       message: 'Valid conversation ID required.',
@@ -990,6 +1252,282 @@ app.post('/api/conversations/:conversationId/messages', async (req, res) => {
       message: 'Failed to send message.',
     });
   }
+});
+
+// ============================================================================
+// HISTORICAL EXPLORER, COMPARISON & STATISTICS (public read routes)
+// ============================================================================
+
+app.get('/api/historical/seasons', async (req, res) => {
+  try {
+    const { limit, offset } = parsePagination(req.query as Record<string, unknown>, { defaultLimit: 50, maxLimit: 100 });
+    const franchise = typeof req.query.franchise === 'string' ? req.query.franchise.trim() : undefined;
+    const data = await listHistoricalSeasons(limit, offset, franchise || undefined);
+    res.status(200).json({ ok: true, count: data.length, data });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to load historical seasons.'); }
+});
+
+app.get('/api/historical/seasons/:seasonId/episodes', async (req, res) => {
+  try {
+    const { limit, offset } = parsePagination(req.query as Record<string, unknown>, { defaultLimit: 100, maxLimit: 100 });
+    const data = await listHistoricalEpisodes(req.params.seasonId, limit, offset);
+    res.status(200).json({ ok: true, count: data.length, data });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to load historical episodes.'); }
+});
+
+app.get('/api/historical/episodes/:episodeId', async (req, res) => {
+  try {
+    const data = await getHistoricalEpisodeDetail(req.params.episodeId);
+    res.status(200).json({ ok: true, ...data });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to load historical episode.'); }
+});
+
+app.get('/api/historical/pitches', async (req, res) => {
+  try {
+    const idFilter = (key: string) => {
+      const value = req.query[key];
+      if (value === undefined || value === '') return undefined;
+      const parsed = Number(value);
+      if (!Number.isSafeInteger(parsed) || parsed < 1) throw new HistoricalServiceError(400, 'INVALID_FILTER', `${key} must be a positive integer.`);
+      return parsed;
+    };
+    const { limit, offset } = parsePagination(req.query as Record<string, unknown>, { defaultLimit: 50, maxLimit: 100 });
+    const dealStatusRaw = typeof req.query.dealStatus === 'string' ? req.query.dealStatus : undefined;
+    const allowedDealStatus = ['PENDING_DUE_DILIGENCE', 'COMPLETED', 'FELL_THROUGH', 'UNKNOWN'];
+    if (dealStatusRaw && !allowedDealStatus.includes(dealStatusRaw)) {
+      res.status(400).json({ error: 'INVALID_FILTER', message: 'dealStatus filter is invalid.' }); return;
+    }
+    const data = await searchHistoricalPitches({
+      search: typeof req.query.search === 'string' ? req.query.search : undefined,
+      seasonId: idFilter('seasonId'), industryId: idFilter('industryId'), sharkId: idFilter('sharkId'),
+      dealStatus: dealStatusRaw as 'PENDING_DUE_DILIGENCE' | 'COMPLETED' | 'FELL_THROUGH' | 'UNKNOWN' | undefined,
+      limit, offset,
+    });
+    res.status(200).json({ ok: true, count: data.length, data });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to search historical pitches.'); }
+});
+
+app.get('/api/historical/sharks', async (_req, res) => {
+  try { const data = await listHistoricalSharks(); res.status(200).json({ ok: true, count: data.length, data }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to load historical Sharks.'); }
+});
+
+app.post('/api/startups/compare', async (req, res) => {
+  try {
+    const result = await compareStartups(req.body?.companyIds);
+    res.status(200).json({ ok: true, ...result });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to compare startups.'); }
+});
+
+app.get('/api/statistics/historical', async (_req, res) => {
+  try { res.status(200).json({ ok: true, ...(await getHistoricalStatistics()) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to calculate historical statistics.'); }
+});
+
+// ============================================================================
+// ADMIN HISTORICAL DATA MANAGEMENT & VALIDATED CSV IMPORT
+// ============================================================================
+
+app.post('/api/admin/historical/seasons', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(201).json({ ok: true, ...(await createHistoricalSeason(req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to create historical season.'); }
+});
+app.put('/api/admin/historical/seasons/:seasonId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await updateHistoricalSeason(req.params.seasonId, req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to update historical season.'); }
+});
+app.delete('/api/admin/historical/seasons/:seasonId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await deleteHistoricalSeason(req.params.seasonId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to delete historical season.'); }
+});
+app.post('/api/admin/historical/episodes', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(201).json({ ok: true, ...(await createHistoricalEpisode(req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to create historical episode.'); }
+});
+app.put('/api/admin/historical/episodes/:episodeId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await updateHistoricalEpisode(req.params.episodeId, req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to update historical episode.'); }
+});
+app.delete('/api/admin/historical/episodes/:episodeId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await deleteHistoricalEpisode(req.params.episodeId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to delete historical episode.'); }
+});
+app.put('/api/admin/historical/episodes/:episodeId/sharks/:sharkId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await assignHistoricalEpisodeSharkSeat(req.params.episodeId, req.params.sharkId, req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to assign Shark to historical episode.'); }
+});
+app.delete('/api/admin/historical/episodes/:episodeId/sharks/:sharkId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await removeHistoricalEpisodeSharkSeat(req.params.episodeId, req.params.sharkId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to remove Shark from historical episode.'); }
+});
+app.post('/api/admin/historical/pitches', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(201).json({ ok: true, ...(await createHistoricalPitch(req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to create historical pitch.'); }
+});
+app.put('/api/admin/historical/pitches/:pitchId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await updateHistoricalPitch(req.params.pitchId, req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to update historical pitch.'); }
+});
+app.delete('/api/admin/historical/pitches/:pitchId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await deleteHistoricalPitch(req.params.pitchId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to delete historical pitch.'); }
+});
+app.post('/api/admin/historical/sharks', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(201).json({ ok: true, ...(await createHistoricalShark(req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to create historical Shark.'); }
+});
+app.put('/api/admin/historical/sharks/:sharkId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await updateHistoricalShark(req.params.sharkId, req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to update historical Shark.'); }
+});
+app.delete('/api/admin/historical/sharks/:sharkId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await deleteHistoricalShark(req.params.sharkId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to delete historical Shark.'); }
+});
+app.post('/api/admin/historical/offers', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(201).json({ ok: true, ...(await createHistoricalOffer(req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to create historical offer.'); }
+});
+app.put('/api/admin/historical/offers/:offerId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await updateHistoricalOffer(req.params.offerId, req.body)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to update historical offer.'); }
+});
+app.delete('/api/admin/historical/offers/:offerId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await deleteHistoricalOffer(req.params.offerId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to delete historical offer.'); }
+});
+app.post('/api/admin/historical/deals', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await upsertHistoricalDeal(req.body, user.userId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to save historical deal outcome.'); }
+});
+app.delete('/api/admin/historical/pitches/:pitchId/deal', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await deleteHistoricalDeal(req.params.pitchId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to delete historical deal outcome.'); }
+});
+app.post('/api/admin/historical/import/pitches', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object with a csv string is required.' }); return;
+  }
+  try { res.status(200).json({ ok: true, report: await importHistoricalPitchesCsv(req.body.csv, user.userId) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to import historical pitches.'); }
+});
+app.get('/api/admin/historical/imports', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try {
+    res.status(200).json({ ok: true, imports: await listHistoricalImportReports(req.query.limit, req.query.offset) });
+  } catch (error) { sendHistoricalError(res, error, 'Failed to load historical import reports.'); }
+});
+app.get('/api/admin/historical/imports/:importId', async (req, res) => {
+  const user = await requireAuthAndRole(req, res, ['ADMIN']); if (!user) return;
+  try { res.status(200).json({ ok: true, ...(await getHistoricalImportReport(req.params.importId)) }); }
+  catch (error) { sendHistoricalError(res, error, 'Failed to load historical import report.'); }
+});
+
+app.post('/api/admin/users/:userId/roles', async (req, res) => {
+  const actor = await requireAuthAndRole(req, res, ['ADMIN']);
+  if (!actor) return;
+  const targetUserId = Number(req.params.userId);
+  if (!Number.isSafeInteger(targetUserId) || targetUserId < 1) {
+    res.status(400).json({ error: 'INVALID_USER_ID', message: 'Valid user ID required.' }); return;
+  }
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'INVALID_BODY', message: 'A JSON object with roleName and action is required.' }); return;
+  }
+  const roleName = typeof req.body.roleName === 'string' ? req.body.roleName.trim().toUpperCase() : '';
+  const action = req.body.action;
+  if (!['VIEWER', 'FOUNDER', 'INVESTOR', 'ADMIN'].includes(roleName) || !['GRANT', 'REVOKE'].includes(action)) {
+    res.status(400).json({ error: 'INVALID_ROLE_CHANGE', message: 'roleName must be VIEWER, FOUNDER, INVESTOR or ADMIN; action must be GRANT or REVOKE.' }); return;
+  }
+  const conn = await dbPool.getConnection();
+  try {
+    await conn.beginTransaction();
+    // Serialize all ADMIN revocations through the role row before taking user locks,
+    // so concurrent revocations cannot each observe multiple admins and remove the last one.
+    if (roleName === 'ADMIN' && action === 'REVOKE') {
+      const [adminRoleLock] = await conn.execute<RowDataPacket[]>(
+        'SELECT role_id FROM app_role WHERE role_name = ? FOR UPDATE', ['ADMIN'],
+      );
+      if (!adminRoleLock.length) {
+        await conn.rollback(); res.status(500).json({ error: 'ROLE_NOT_CONFIGURED', message: 'ADMIN role is not configured.' }); return;
+      }
+    }
+    const [users] = await conn.execute<RowDataPacket[]>(
+      `SELECT user_id AS userId, full_name AS fullName, email, account_status AS accountStatus
+       FROM app_user WHERE user_id = ? FOR UPDATE`, [targetUserId],
+    );
+    if (!users.length || users[0].accountStatus !== 'ACTIVE') {
+      await conn.rollback(); res.status(404).json({ error: 'USER_NOT_FOUND', message: 'Active target account not found.' }); return;
+    }
+    const [roles] = await conn.execute<RowDataPacket[]>('SELECT role_id AS roleId FROM app_role WHERE role_name = ?', [roleName]);
+    if (!roles.length) { await conn.rollback(); res.status(500).json({ error: 'ROLE_NOT_CONFIGURED', message: `Role ${roleName} is not configured.` }); return; }
+    const roleId = Number(roles[0].roleId);
+    const [present] = await conn.execute<RowDataPacket[]>('SELECT user_id FROM user_role WHERE user_id = ? AND role_id = ? FOR UPDATE', [targetUserId, roleId]);
+    if (action === 'GRANT') {
+      if (!present.length) {
+        await conn.execute('INSERT INTO user_role (user_id, role_id) VALUES (?, ?)', [targetUserId, roleId]);
+        await conn.execute(`INSERT INTO application_audit_log (table_name, operation_type, record_id, old_data, new_data) VALUES ('user_role', 'INSERT', ?, NULL, JSON_OBJECT('roleName', ?))`, [targetUserId, roleName]);
+      }
+      // Role-specific routes require the backing profile row as well as user_role.
+      const nameParts = String(users[0].fullName || users[0].email.split('@')[0]).trim().split(/\s+/);
+      const firstName = nameParts[0] || 'User';
+      const lastName = nameParts.slice(1).join(' ') || (roleName === 'FOUNDER' ? 'Founder' : 'Investor');
+      if (roleName === 'FOUNDER') {
+        await conn.execute(
+          `INSERT INTO founder (user_id, first_name, last_name, email) VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE first_name = VALUES(first_name)`,
+          [targetUserId, firstName, lastName, users[0].email],
+        );
+      } else if (roleName === 'INVESTOR') {
+        await conn.execute(
+          `INSERT INTO investor (user_id, first_name, last_name, display_name) VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE display_name = VALUES(display_name)`,
+          [targetUserId, firstName, lastName, users[0].fullName],
+        );
+      }
+    } else if (action === 'REVOKE' && present.length) {
+      if (roleName === 'ADMIN') {
+        const [admins] = await conn.execute<RowDataPacket[]>(
+          `SELECT COUNT(DISTINCT ur.user_id) AS activeAdmins FROM user_role ur
+           JOIN app_role r ON r.role_id = ur.role_id JOIN app_user u ON u.user_id = ur.user_id
+           WHERE r.role_name = 'ADMIN' AND u.account_status = 'ACTIVE'`,
+        );
+        if (Number(admins[0]?.activeAdmins ?? 0) <= 1) {
+          await conn.rollback(); res.status(409).json({ error: 'LAST_ADMIN', message: 'The last active Administrator cannot be removed.' }); return;
+        }
+      }
+      await conn.execute('DELETE FROM user_role WHERE user_id = ? AND role_id = ?', [targetUserId, roleId]);
+      await conn.execute(`INSERT INTO application_audit_log (table_name, operation_type, record_id, old_data, new_data) VALUES ('user_role', 'DELETE', ?, JSON_OBJECT('roleName', ?), NULL)`, [targetUserId, roleName]);
+    }
+    await conn.commit();
+    const [current] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT r.role_name AS roleName FROM user_role ur JOIN app_role r ON r.role_id = ur.role_id WHERE ur.user_id = ? ORDER BY r.role_name`, [targetUserId],
+    );
+    res.status(200).json({ ok: true, userId: targetUserId, roles: current.map(row => row.roleName), action, roleName });
+  } catch (error) {
+    await conn.rollback().catch(() => undefined);
+    console.error('Admin role-management error:', error);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to change user role.' });
+  } finally { conn.release(); }
 });
 
 app.get('/api/startups', async (req, res) => {
@@ -1074,6 +1612,10 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
   }
   if (err?.type === 'entity.parse.failed') {
     res.status(400).json({ error: 'INVALID_JSON', message: 'Request body is not valid JSON.' });
+    return;
+  }
+  if (err instanceof ValidationError) {
+    res.status(err.status).json({ error: err.code, message: err.message });
     return;
   }
   console.error('Unhandled request error:', err?.message ?? err);

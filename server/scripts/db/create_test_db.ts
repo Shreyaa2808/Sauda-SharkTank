@@ -20,10 +20,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import mysql from 'mysql2/promise';
 import type { RowDataPacket } from 'mysql2';
-import { assertDisposableTestTarget, resolveTarget } from './lib.js';
+import { assertDisposableTestTarget, loadMigrations, planBaselineMarks, resolveTarget } from './lib.js';
+import os from 'node:os';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BASELINE_DIR = path.resolve(here, '../../../database/baseline');
+const BASELINE_INFO_PATH = path.join(BASELINE_DIR, 'BASELINE_INFO.json');
+const MIGRATIONS_DIR = path.resolve(here, '../../../database/migrations');
+const TRACKING_SQL_PATH = path.resolve(here, '../../../database/schema_migrations.sql');
 
 function fail(msg: string, code = 1): never {
   console.error(`[test-db] ${msg}`);
@@ -77,11 +81,38 @@ async function main() {
       );
     }
 
+    if (!fs.existsSync(BASELINE_INFO_PATH)) {
+      return fail('BLOCKED: database/baseline/BASELINE_INFO.json is missing. Nothing was loaded.');
+    }
+    if (!fs.existsSync(TRACKING_SQL_PATH)) {
+      return fail('BLOCKED: database/schema_migrations.sql is missing. Nothing was loaded.');
+    }
+
+    // Validate the baseline's migration claims before changing the empty schema.
+    const baselineInfo = JSON.parse(fs.readFileSync(BASELINE_INFO_PATH, 'utf8')) as unknown;
+    const migrations = loadMigrations(MIGRATIONS_DIR);
+    const includedMigrations = planBaselineMarks(baselineInfo, migrations);
+
     for (const f of baselineFiles) {
       console.log(`[test-db] loading baseline ${f} into ${target.database}`);
       await conn.query(fs.readFileSync(path.join(BASELINE_DIR, f), 'utf8'));
     }
-    console.log(`[test-db] baseline loaded into ${target.database}. Next: npm run db:migrate -- --target test (add --apply only after reviewing the plan).`);
+
+    // A baseline already contains the schema represented by these migrations. Record
+    // that fact immediately so the next planner run cannot try to execute non-idempotent
+    // migration DDL a second time. Use the migration file checksum, not the dump checksum.
+    await conn.query(fs.readFileSync(TRACKING_SQL_PATH, 'utf8'));
+    for (const migration of includedMigrations) {
+      await conn.execute(
+        `INSERT INTO schema_migrations
+           (version, filename, checksum_sha256, status, applied_at, applied_by)
+         VALUES (?, ?, ?, 'BASELINED', CURRENT_TIMESTAMP, ?)`,
+        [migration.version, migration.filename, migration.checksum, os.userInfo().username],
+      );
+      console.log(`[test-db] recorded migration ${migration.version} (${migration.filename}) as BASELINED`);
+    }
+
+    console.log(`[test-db] baseline loaded and tracking initialized in ${target.database}. Next: npm run db:migrate -- --target test (review the plan before considering --apply).`);
     console.log('[test-db] No database was created or dropped by this script.');
   } finally {
     await conn.end();

@@ -24,7 +24,7 @@ function isMysqlDuplicateEntryError(error: unknown): boolean {
  */
 function validateBoundedText(
   input: unknown,
-  opts: { required: boolean; maxLength: number; label: string; emptyError: string },
+  opts: { required: boolean; maxLength: number; label: string; emptyError: string; typeError?: string; lengthError?: string },
 ): BoundedTextResult {
   if (input === undefined || input === null) {
     return opts.required
@@ -32,7 +32,7 @@ function validateBoundedText(
       : { ok: true, value: null };
   }
   if (typeof input !== 'string') {
-    return { ok: false, error: 'INVALID_MESSAGE', message: `${opts.label} must be text.` };
+    return { ok: false, error: opts.typeError || 'INVALID_MESSAGE', message: `${opts.label} must be text.` };
   }
   const trimmed = input.trim();
   if (!trimmed) {
@@ -43,7 +43,7 @@ function validateBoundedText(
   if (trimmed.length > opts.maxLength) {
     return {
       ok: false,
-      error: 'MESSAGE_TOO_LONG',
+      error: opts.lengthError || 'MESSAGE_TOO_LONG',
       message: `${opts.label} must be ${opts.maxLength} characters or fewer.`,
     };
   }
@@ -209,14 +209,13 @@ export async function getInvestorPitches(
     whereClauses.push('usp.pitch_id IS NOT NULL');
   }
 
-  let orderBy = 'p.submitted_at DESC, p.pitch_id DESC';
-  if (filters.sortBy === 'ask_asc') {
-    orderBy = 'p.original_ask_amount ASC';
-  } else if (filters.sortBy === 'ask_desc') {
-    orderBy = 'p.original_ask_amount DESC';
-  } else if (filters.sortBy === 'brand_name') {
-    orderBy = 'c.brand_name ASC';
-  }
+  const SORT_ORDERS: Record<string, string> = {
+    latest: 'p.submitted_at DESC, p.pitch_id DESC',
+    ask_asc: 'p.original_ask_amount ASC, p.pitch_id DESC',
+    ask_desc: 'p.original_ask_amount DESC, p.pitch_id DESC',
+    brand_name: 'c.brand_name ASC, p.pitch_id DESC',
+  };
+  const orderBy = (filters.sortBy && SORT_ORDERS[filters.sortBy]) ? SORT_ORDERS[filters.sortBy] : SORT_ORDERS.latest;
 
   const query = `
     SELECT
@@ -284,21 +283,49 @@ export async function getInvestorPitches(
 export async function toggleWatchlist(
   userId: number,
   pitchId: number,
-): Promise<{ saved: boolean }> {
-  const [existing] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT 1 FROM user_saved_pitch WHERE user_id = ? AND pitch_id = ?`,
-    [userId, pitchId],
-  );
+): Promise<{ saved: boolean } | { success: false; status: number; error: string; message: string }> {
+  const conn = await dbPool.getConnection();
+  try {
+    await conn.beginTransaction();
+    // Use the pitch as the serialization point for both first-time saves and archive
+    // operations. A concurrent toggle for the same pitch waits, then sees the latest row.
+    const [pitchRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT pitch_id, pitch_status FROM pitch WHERE pitch_id = ? FOR UPDATE`,
+      [pitchId],
+    );
+    if (pitchRows.length === 0) {
+      await conn.rollback();
+      return { success: false, status: 404, error: 'PITCH_NOT_FOUND', message: 'Pitch listing not found.' };
+    }
+    const [existing] = await conn.execute<RowDataPacket[]>(
+      `SELECT user_id FROM user_saved_pitch WHERE user_id = ? AND pitch_id = ? FOR UPDATE`,
+      [userId, pitchId],
+    );
+    if (existing.length > 0) {
+      await conn.execute(`DELETE FROM user_saved_pitch WHERE user_id = ? AND pitch_id = ?`, [userId, pitchId]);
+      await conn.commit();
+      return { saved: false };
+    }
 
-  if (existing.length > 0) {
-    await dbPool.execute(`DELETE FROM user_saved_pitch WHERE user_id = ? AND pitch_id = ?`, [userId, pitchId]);
-    return { saved: false };
-  } else {
-    await dbPool.execute(
+    if (pitchRows[0].pitch_status !== 'PUBLISHED') {
+      await conn.rollback();
+      return { success: false, status: 409, error: 'PITCH_NOT_VISIBLE', message: 'Only published pitches can be saved to a watchlist.' };
+    }
+
+    await conn.execute(
       `INSERT INTO user_saved_pitch (user_id, pitch_id, saved_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
       [userId, pitchId],
     );
+    await conn.commit();
     return { saved: true };
+  } catch (error) {
+    await conn.rollback().catch(() => undefined);
+    if (isMysqlDuplicateEntryError(error)) {
+      return { success: false, status: 409, error: 'WATCHLIST_CONFLICT', message: 'Watchlist changed concurrently. Refresh and try again.' };
+    }
+    throw error;
+  } finally {
+    conn.release();
   }
 }
 
@@ -321,6 +348,7 @@ export interface ConnectionRequestItem {
   statusReason: string | null;
   createdAt: string;
   respondedAt: string | null;
+  withdrawnAt: string | null;
   endedAt: string | null;
   conversationId: number | null;
   conversationStatus: 'OPEN' | 'READ_ONLY' | null;
@@ -331,7 +359,6 @@ export async function createConnectionRequest(
   pitchId: number,
   initialMessage?: unknown,
 ): Promise<{ success: true; requestId: number; request: ConnectionRequestItem } | { success: false; status: number; error: string; message: string }> {
-  // 0. Validate introduction message bounds before touching the database
   const introCheck = validateBoundedText(initialMessage, {
     required: false,
     maxLength: MAX_INTRO_MESSAGE_LENGTH,
@@ -342,107 +369,109 @@ export async function createConnectionRequest(
     return { success: false, status: 400, error: introCheck.error, message: introCheck.message };
   }
 
-  // 1. Verify pitch existence and publication
-  const [pitchRows] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT p.pitch_id, p.pitch_type, p.pitch_status, p.submitted_by_user_id, c.brand_name
-     FROM pitch p
-     INNER JOIN company c ON c.company_id = p.company_id
-     WHERE p.pitch_id = ?`,
-    [pitchId],
-  );
-
-  if (pitchRows.length === 0) {
-    return {
-      success: false,
-      status: 404,
-      error: 'PITCH_NOT_FOUND',
-      message: 'Pitch listing not found.',
-    };
-  }
-
-  const pitch = pitchRows[0];
-
-  if (pitch.pitch_type !== 'PLATFORM') {
-    return {
-      success: false,
-      status: 400,
-      error: 'PLATFORM_ONLY',
-      message: 'Connection requests can only be initiated for registered Platform venture listings.',
-    };
-  }
-
-  if (pitch.pitch_status !== 'PUBLISHED') {
-    return {
-      success: false,
-      status: 400,
-      error: 'PITCH_NOT_PUBLISHED',
-      message: 'Connection requests can only be sent to published listings.',
-    };
-  }
-
-  const founderUserId = Number(pitch.submitted_by_user_id);
-
-  // Security check: distinct parties
-  if (investorUserId === founderUserId) {
-    return {
-      success: false,
-      status: 400,
-      error: 'SELF_CONNECTION_FORBIDDEN',
-      message: 'You cannot initiate a connection request with your own venture.',
-    };
-  }
-
-  // 2. Ensure linked records exist in founder and investor tables to satisfy foreign keys
   const conn = await dbPool.getConnection();
   try {
     await conn.beginTransaction();
 
-    // Check investor record
+    // Serialize request creation with archiveFounderPitch by locking the same pitch
+    // row before checking publication and before inserting a request. The lock order
+    // is pitch -> request, matching the archive path's pitch-first order.
+    const [pitchRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT p.pitch_id, p.pitch_type, p.pitch_status, p.submitted_by_user_id, c.brand_name
+       FROM pitch p
+       INNER JOIN company c ON c.company_id = p.company_id
+       WHERE p.pitch_id = ?
+       FOR UPDATE`,
+      [pitchId],
+    );
+    if (pitchRows.length === 0) {
+      await conn.rollback();
+      return { success: false, status: 404, error: 'PITCH_NOT_FOUND', message: 'Pitch listing not found.' };
+    }
+
+    const pitch = pitchRows[0];
+    if (pitch.pitch_type !== 'PLATFORM') {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 400,
+        error: 'PLATFORM_ONLY',
+        message: 'Connection requests can only be initiated for registered Platform venture listings.',
+      };
+    }
+    if (pitch.pitch_status !== 'PUBLISHED') {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 409,
+        error: 'PITCH_NOT_PUBLISHED',
+        message: 'Connection requests can only be sent to published listings.',
+      };
+    }
+
+    const founderUserId = Number(pitch.submitted_by_user_id);
+    if (investorUserId === founderUserId) {
+      await conn.rollback();
+      return {
+        success: false,
+        status: 400,
+        error: 'SELF_CONNECTION_FORBIDDEN',
+        message: 'You cannot initiate a connection request with your own venture.',
+      };
+    }
+
+    // Ensure profile rows required by foreign keys exist inside the same transaction.
     const [invRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT user_id FROM investor WHERE user_id = ?`,
+      `SELECT user_id FROM investor WHERE user_id = ? FOR UPDATE`,
       [investorUserId],
     );
     if (invRows.length === 0) {
       const [uRows] = await conn.execute<RowDataPacket[]>(
-        `SELECT full_name FROM app_user WHERE user_id = ?`,
+        `SELECT full_name FROM app_user WHERE user_id = ? AND account_status = 'ACTIVE'`,
         [investorUserId],
       );
-      const nameParts = (uRows[0]?.full_name || 'Investor').trim().split(/\s+/);
+      if (uRows.length === 0) {
+        await conn.rollback();
+        return { success: false, status: 401, error: 'USER_NOT_ACTIVE', message: 'Active investor account not found.' };
+      }
+      const nameParts = String(uRows[0].full_name || 'Investor').trim().split(/\s+/);
       await conn.execute(
         `INSERT INTO investor (user_id, first_name, last_name, display_name)
          VALUES (?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE display_name = VALUES(display_name)`,
-        [investorUserId, nameParts[0], nameParts.slice(1).join(' ') || 'Investor', uRows[0]?.full_name],
+        [investorUserId, nameParts[0], nameParts.slice(1).join(' ') || 'Investor', uRows[0].full_name],
       );
     }
 
-    // Check founder record
-    const [fdrRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT user_id FROM founder WHERE user_id = ?`,
+    const [founderRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT user_id FROM founder WHERE user_id = ? FOR UPDATE`,
       [founderUserId],
     );
-    if (fdrRows.length === 0) {
+    if (founderRows.length === 0) {
       const [uRows] = await conn.execute<RowDataPacket[]>(
-        `SELECT full_name, email FROM app_user WHERE user_id = ?`,
+        `SELECT full_name, email FROM app_user WHERE user_id = ? AND account_status = 'ACTIVE'`,
         [founderUserId],
       );
-      const nameParts = (uRows[0]?.full_name || 'Founder').trim().split(/\s+/);
+      if (uRows.length === 0) {
+        await conn.rollback();
+        return { success: false, status: 409, error: 'FOUNDER_NOT_ACTIVE', message: 'The listing owner is not an active account.' };
+      }
+      const nameParts = String(uRows[0].full_name || 'Founder').trim().split(/\s+/);
       await conn.execute(
         `INSERT INTO founder (user_id, first_name, last_name, email)
          VALUES (?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE first_name = VALUES(first_name)`,
-        [founderUserId, nameParts[0], nameParts.slice(1).join(' ') || 'Founder', uRows[0]?.email],
+        [founderUserId, nameParts[0], nameParts.slice(1).join(' ') || 'Founder', uRows[0].email],
       );
     }
 
-    // Check for existing active request
     const [existingActive] = await conn.execute<RowDataPacket[]>(
       `SELECT request_id, request_status
        FROM connection_request
-       WHERE investor_user_id = ? AND founder_user_id = ? AND request_status IN ('PENDING', 'ACCEPTED')`,
+       WHERE investor_user_id = ? AND founder_user_id = ? AND request_status IN ('PENDING', 'ACCEPTED')
+       FOR UPDATE`,
       [investorUserId, founderUserId],
     );
-
     if (existingActive.length > 0) {
       await conn.rollback();
       return {
@@ -453,39 +482,20 @@ export async function createConnectionRequest(
       };
     }
 
-    const cleanMessage = introCheck.value;
-
-    // Insert connection request
     const [insertResult] = await conn.execute<ResultSetHeader>(
       `INSERT INTO connection_request (
-         pitch_id,
-         investor_user_id,
-         founder_user_id,
-         request_status,
-         initial_message,
-         created_at
+         pitch_id, investor_user_id, founder_user_id, request_status, initial_message, created_at
        ) VALUES (?, ?, ?, 'PENDING', ?, CURRENT_TIMESTAMP)`,
-      [pitchId, investorUserId, founderUserId, cleanMessage],
+      [pitchId, investorUserId, founderUserId, introCheck.value],
     );
-
     const requestId = insertResult.insertId;
-
     await conn.commit();
 
     const request = await getConnectionRequestById(requestId);
-    if (!request) {
-      throw new Error('Could not retrieve created connection request');
-    }
-
-    return {
-      success: true,
-      requestId,
-      request,
-    };
+    if (!request) throw new Error('Could not retrieve created connection request');
+    return { success: true, requestId, request };
   } catch (err) {
     await conn.rollback().catch(() => undefined);
-    // uq_connection_request_active_pair is the final authority when concurrent
-    // requests race past the application-level existence check.
     if (isMysqlDuplicateEntryError(err)) {
       return {
         success: false,
@@ -495,12 +505,7 @@ export async function createConnectionRequest(
       };
     }
     console.error('Failed to create connection request:', err);
-    return {
-      success: false,
-      status: 500,
-      error: 'SERVER_ERROR',
-      message: 'Failed to initiate connection request.',
-    };
+    return { success: false, status: 500, error: 'SERVER_ERROR', message: 'Failed to initiate connection request.' };
   } finally {
     conn.release();
   }
@@ -523,6 +528,7 @@ export async function getConnectionRequestById(requestId: number): Promise<Conne
        cr.status_reason AS statusReason,
        cr.created_at AS createdAt,
        cr.responded_at AS respondedAt,
+       cr.withdrawn_at AS withdrawnAt,
        cr.ended_at AS endedAt,
        conv.conversation_id AS conversationId,
        conv.conversation_status AS conversationStatus
@@ -564,6 +570,7 @@ export async function getUserConnections(userId: number): Promise<{
        cr.status_reason AS statusReason,
        cr.created_at AS createdAt,
        cr.responded_at AS respondedAt,
+       cr.withdrawn_at AS withdrawnAt,
        cr.ended_at AS endedAt,
        conv.conversation_id AS conversationId,
        conv.conversation_status AS conversationStatus
@@ -734,6 +741,70 @@ export async function respondToConnectionRequest(
       error: 'SERVER_ERROR',
       message: 'Failed to process connection response.',
     };
+  } finally {
+    conn.release();
+  }
+}
+
+export async function withdrawConnectionRequest(
+  userId: number,
+  requestId: number,
+  reason?: unknown,
+): Promise<{ success: true; request: ConnectionRequestItem } | { success: false; status: number; error: string; message: string }> {
+  const reasonCheck = validateBoundedText(reason, {
+    required: false,
+    maxLength: 255,
+    label: 'Withdrawal reason',
+    emptyError: 'INVALID_REASON',
+    typeError: 'INVALID_REASON',
+    lengthError: 'REASON_TOO_LONG',
+  });
+  if (!reasonCheck.ok) {
+    return { success: false, status: 400, error: reasonCheck.error, message: reasonCheck.message };
+  }
+
+  const conn = await dbPool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      `SELECT request_id AS requestId, investor_user_id AS investorUserId,
+              request_status AS requestStatus
+       FROM connection_request WHERE request_id = ? FOR UPDATE`,
+      [requestId],
+    );
+    if (rows.length === 0) {
+      await conn.rollback();
+      return { success: false, status: 404, error: 'REQUEST_NOT_FOUND', message: 'Connection request not found.' };
+    }
+    const row = rows[0];
+    if (Number(row.investorUserId) !== Number(userId)) {
+      await conn.rollback();
+      return { success: false, status: 403, error: 'UNAUTHORIZED_REQUESTER', message: 'Only the investor who sent this request can withdraw it.' };
+    }
+    if (row.requestStatus !== 'PENDING') {
+      await conn.rollback();
+      return { success: false, status: 409, error: 'INVALID_STATE', message: `Only pending requests can be withdrawn; current state is ${row.requestStatus}.` };
+    }
+
+    const [updated] = await conn.execute<ResultSetHeader>(
+      `UPDATE connection_request
+       SET request_status = 'WITHDRAWN', withdrawn_at = CURRENT_TIMESTAMP,
+           status_reason = ?
+       WHERE request_id = ? AND request_status = 'PENDING'`,
+      [reasonCheck.value || 'withdrawn by investor', requestId],
+    );
+    if (updated.affectedRows !== 1) {
+      await conn.rollback();
+      return { success: false, status: 409, error: 'INVALID_STATE', message: 'The request was already handled. Refresh and try again.' };
+    }
+    await conn.commit();
+    const request = await getConnectionRequestById(requestId);
+    if (!request) return { success: false, status: 500, error: 'SERVER_ERROR', message: 'Request was withdrawn but could not be reloaded.' };
+    return { success: true, request };
+  } catch (err) {
+    await conn.rollback().catch(() => undefined);
+    console.error('Failed to withdraw connection request:', err);
+    return { success: false, status: 500, error: 'SERVER_ERROR', message: 'Failed to withdraw connection request.' };
   } finally {
     conn.release();
   }
