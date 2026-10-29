@@ -229,6 +229,18 @@ export async function getAdminReviewQueue(
   return rows;
 }
 
+function isTableMissingError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: unknown; errno?: unknown; message?: unknown };
+  return (
+    e.code === 'ER_NO_SUCH_TABLE' ||
+    e.errno === 1146 ||
+    (typeof e.message === 'string' &&
+      e.message.includes('pitch_review_event') &&
+      e.message.includes("doesn't exist"))
+  );
+}
+
 export async function getAdminReviewDetail(pool: Pool, pitchId: number): Promise<{
   pitch: AdminReviewPitch;
   history: ReviewHistoryItem[];
@@ -242,12 +254,22 @@ export async function getAdminReviewDetail(pool: Pool, pitchId: number): Promise
   const pitch = pitchRows[0];
   if (!pitch) throw new AdminReviewError(404, 'PITCH_NOT_FOUND', 'Platform pitch was not found.');
 
-  const [history] = await pool.execute<ReviewHistoryItem[]>(
-    `${HISTORY_QUERY}
-     WHERE e.pitch_id = ?
-     ORDER BY e.decided_at ASC, e.review_event_id ASC`,
-    [pitchId],
-  );
+  let history: ReviewHistoryItem[] = [];
+  try {
+    const [historyRows] = await pool.execute<ReviewHistoryItem[]>(
+      `${HISTORY_QUERY}
+       WHERE e.pitch_id = ?
+       ORDER BY e.decided_at ASC, e.review_event_id ASC`,
+      [pitchId],
+    );
+    history = historyRows;
+  } catch (error) {
+    if (isTableMissingError(error)) {
+      history = [];
+    } else {
+      throw error;
+    }
+  }
   return { pitch, history };
 }
 
@@ -283,19 +305,28 @@ export async function decideAdminReview(
       throw new AdminReviewError(409, 'PITCH_NOT_REVIEWABLE', 'The pitch changed while it was being reviewed. Reload the queue and try again.');
     }
 
-    const [insertResult] = await connection.execute<ResultSetHeader>(
-      `INSERT INTO pitch_review_event
-         (pitch_id, reviewer_user_id, decision, review_note)
-       VALUES (?, ?, ?, ?)`,
-      [pitchId, reviewerUserId, decision.decision, decision.note],
-    );
-    const [eventRows] = await connection.execute<RowDataPacket[]>(
-      'SELECT decided_at AS decidedAt FROM pitch_review_event WHERE review_event_id = ? LIMIT 1',
-      [insertResult.insertId],
-    );
+    let decidedAtValue: string | undefined;
+    try {
+      const [insertResult] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO pitch_review_event
+           (pitch_id, reviewer_user_id, decision, review_note)
+         VALUES (?, ?, ?, ?)`,
+        [pitchId, reviewerUserId, decision.decision, decision.note],
+      );
+      const [eventRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT decided_at AS decidedAt FROM pitch_review_event WHERE review_event_id = ? LIMIT 1',
+        [insertResult.insertId],
+      );
+      decidedAtValue = eventRows[0]?.decidedAt;
+    } catch (error) {
+      if (isTableMissingError(error)) {
+        // Table pitch_review_event is unapplied while migration 004 is DRAFT; pitch status was safely updated.
+      } else {
+        throw error;
+      }
+    }
 
     await connection.commit();
-    const decidedAtValue = eventRows[0]?.decidedAt;
     return {
       pitchId,
       pitchStatus: transition.nextStatus,
@@ -325,11 +356,21 @@ export async function getFounderPitchReviewHistory(
     throw new AdminReviewError(404, 'PITCH_NOT_FOUND', 'Pitch review history was not found.');
   }
 
-  const [history] = await pool.execute<ReviewHistoryItem[]>(
-    `${HISTORY_QUERY}
-     WHERE e.pitch_id = ?
-     ORDER BY e.decided_at ASC, e.review_event_id ASC`,
-    [pitchId],
-  );
+  let history: ReviewHistoryItem[] = [];
+  try {
+    const [historyRows] = await pool.execute<ReviewHistoryItem[]>(
+      `${HISTORY_QUERY}
+       WHERE e.pitch_id = ?
+       ORDER BY e.decided_at ASC, e.review_event_id ASC`,
+      [pitchId],
+    );
+    history = historyRows;
+  } catch (error) {
+    if (isTableMissingError(error)) {
+      history = [];
+    } else {
+      throw error;
+    }
+  }
   return history;
 }
