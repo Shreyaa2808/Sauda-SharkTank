@@ -200,6 +200,17 @@ export const App: React.FC = () => {
   // Left navigation drawer
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const hamburgerRef = React.useRef<HTMLButtonElement>(null);
+  const topSearchRef = React.useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (topSearchRef.current) { e.preventDefault(); topSearchRef.current.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Detail Modal & Comparison Matrix States
   const [selectedDetailStartup, setSelectedDetailStartup] = useState<Startup | null>(null);
@@ -644,6 +655,7 @@ export const App: React.FC = () => {
   return (
     <main className="app-shell">
       <CursorGlow />
+      <ScrollProgress />
       <SlideInObserver />
       {/* 0. CINEMATIC SHARK VIDEO INTRO OVERLAY */}
       {introActive && (
@@ -763,18 +775,25 @@ export const App: React.FC = () => {
               {currentUser && <button type="button" onClick={() => switchWorkspaceWithTransition('dashboard')}>Dashboard</button>}
             </nav>
             <form
-              className="topbar-search"
+              className="topbar-search topbar-search--pro"
               role="search"
               onSubmit={(e) => { e.preventDefault(); scrollToExplorer(); }}
             >
+              <span className="topbar-search-icon" aria-hidden="true">⌕</span>
               <input
+                ref={topSearchRef}
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search startups, sectors, cities…"
                 aria-label="Search startups"
               />
-              <button type="submit" aria-label="Search">⌕</button>
+              {search ? (
+                <button type="button" className="topbar-search-clear" aria-label="Clear search" onClick={() => setSearch('')}>×</button>
+              ) : (
+                <kbd aria-hidden="true">/</kbd>
+              )}
+              <button type="submit" className="topbar-search-go" aria-label="Search">→</button>
             </form>
           </>
         )}
@@ -1035,7 +1054,6 @@ export const App: React.FC = () => {
       {currentRoute === 'discovery' && (
         <>
           {/* 2. MODERN FINANCE HERO & PLATFORM TELEMETRY */}
-          <ScrollProgress />
           <SectionRail />
           <DiscoveryHero
             loading={loading}
@@ -1052,7 +1070,7 @@ export const App: React.FC = () => {
             }}
           />
 
-          <HomeStory startups={startups} onExplore={scrollToExplorer} />
+          <HomeStory startups={startups} />
 
       {/* 3. STARTUP EXPLORER SECTION */}
       <section className="explorer" id="explorer">
@@ -1112,7 +1130,6 @@ export const App: React.FC = () => {
               placeholder="Search by brand, sector, city, stage..."
               aria-label="Search by brand, sector, city, or stage"
             />
-            <kbd>SEARCH</kbd>
           </label>
 
           <div

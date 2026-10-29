@@ -920,3 +920,16 @@
 .section-rail i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #C3A064; background: rgba(6,17,28,.6); transition: transform .3s, background .3s, box-shadow .3s; }
 .section-rail a.on i { background: #C3A064; transform: scale(1.5); box-shadow: 0 0 0 5px rgba(195,160,100,.25); }
 @media (max-width: 860px) { .section-rail { display: none; } }
+
+/* Top bar search: pill that widens and glows on focus */
+.topbar-search.topbar-search--pro { position: relative; display: flex; align-items: center; gap: 8px; width: clamp(200px, 22vw, 300px); height: 42px; padding: 0 6px 0 14px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(224,199,151,.28); backdrop-filter: blur(10px); transition: width .35s cubic-bezier(.2,.7,.2,1), border-color .25s, box-shadow .25s, background .25s; }
+.topbar-search.topbar-search--pro:focus-within { width: clamp(260px, 32vw, 440px); border-color: #C3A064; background: rgba(255,255,255,.14); box-shadow: 0 0 0 4px rgba(195,160,100,.18), 0 10px 30px rgba(0,0,0,.25); }
+.topbar-search--pro .topbar-search-icon { font-size: 18px; color: #C3A064; line-height: 1; }
+.topbar-search--pro input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; color: inherit; font-size: 14px; }
+.topbar-search--pro input::-webkit-search-cancel-button { display: none; }
+.topbar-search--pro kbd { font: 700 11px/1 inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(224,199,151,.4); color: #C3A064; }
+.topbar-search--pro button { width: 30px; height: 30px; flex: none; border: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer; font-size: 16px; transition: transform .2s, background .2s; }
+.topbar-search--pro .topbar-search-go { background: linear-gradient(135deg, #E0C797, #C3A064); color: #06111C; }
+.topbar-search--pro .topbar-search-go:hover { transform: translateX(2px); }
+.topbar-search--pro .topbar-search-clear { background: rgba(255,255,255,.14); color: inherit; font-size: 18px; }
+@media (max-width: 960px) { .topbar-search.topbar-search--pro { display: none; } }

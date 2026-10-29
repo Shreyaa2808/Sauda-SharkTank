@@ -153,7 +153,14 @@ export const SectionRail: React.FC = () => {
 export const SlideInObserver: React.FC = () => {
   React.useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || typeof IntersectionObserver === 'undefined') return;
-    const SEL = '.startup-card, .section-heading, .toolbar, .results-bar';
+    const SEL = [
+      '.startup-card', '.section-heading', '.toolbar', '.results-bar',
+      '.episode-card', '.archive-pitch-card', '.archive-section',
+      '.vd-metric-card', '.vd-action-card', '.vd-panel',
+      '.founder-kpi-card', '.founder-pitch-card', '.founder-profile-section', '.founder-recent-section', '.feedback-card',
+      '.investor-deal-card', '.investor-kpi-card', '.breakdown-card', '.investor-preferences-section',
+      '.profile-form-card', '.profile-summary-card', '.settings-card', '.settings-actions-card',
+    ].join(', ');
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -170,7 +177,7 @@ export const SlideInObserver: React.FC = () => {
     const seen = new WeakSet<Element>();
     const scan = () => {
       document.querySelectorAll<HTMLElement>(SEL).forEach((el) => {
-        if (seen.has(el) || el.classList.contains('skeleton-card')) return;
+        if (seen.has(el) || el.classList.contains('skeleton-card') || el.closest('[role="dialog"], [aria-modal="true"], [class*="modal"]')) return;
         seen.add(el);
         el.classList.add('slide-r');
         io.observe(el);
@@ -191,7 +198,7 @@ const STORY_STEPS = [
 ];
 
 /** Scroll-driven story band between the hero and the venture registry. */
-export const HomeStory: React.FC<{ startups: Startup[]; onExplore: () => void }> = ({ startups, onExplore }) => {
+export const HomeStory: React.FC<{ startups: Startup[] }> = ({ startups }) => {
   const ref = React.useRef<HTMLElement>(null);
   useScrollReveal(ref);
   const names = React.useMemo(() => startups.map((s) => s.brandName).filter(Boolean).slice(0, 14), [startups]);
@@ -235,16 +242,6 @@ export const HomeStory: React.FC<{ startups: Startup[]; onExplore: () => void }>
           ))}
         </ol>
 
-        <div className="home-cta-card" data-reveal>
-          <div>
-            <h3>Ready to take the stage?</h3>
-            <p>Step into the registry and find the venture worth your next conversation.</p>
-          </div>
-          <button type="button" className="home-btn home-btn-primary" onClick={onExplore}>
-            <span>Start exploring</span>
-            <span aria-hidden="true">→</span>
-          </button>
-        </div>
       </div>
     </section>
   );
@@ -257,8 +254,7 @@ const FeaturedSpotlight: React.FC<{
   hasError: boolean;
   reducedMotion: boolean;
   onSelect: (startup: Startup) => void;
-  onViewAll: () => void;
-}> = ({ startups, loading, hasError, reducedMotion, onSelect, onViewAll }) => {
+}> = ({ startups, loading, hasError, reducedMotion, onSelect }) => {
   const pool = React.useMemo(() => startups.slice(0, FEATURED_COUNT), [startups]);
   const [rawIndex, setRawIndex] = React.useState(0);
   const [userPaused, setUserPaused] = React.useState(false);
@@ -368,9 +364,6 @@ const FeaturedSpotlight: React.FC<{
               <span key={p.pitchId} className={i === index ? 'on' : ''} />
             ))}
           </div>
-          <button type="button" className="spotlight-all" onClick={onViewAll}>
-            Browse all ventures
-          </button>
         </div>
       </div>
     </aside>
@@ -492,15 +485,9 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
             hasError={unavailable}
             reducedMotion={reducedMotion}
             onSelect={onSelectStartup}
-            onViewAll={onExplore}
           />
         </div>
       </div>
-
-      <a className="home-scroll-cue" href="#explorer" onClick={(e) => { e.preventDefault(); onExplore(); }} aria-label="Scroll to the venture registry">
-        <span>Scroll</span>
-        <i aria-hidden="true" />
-      </a>
 
       <div className="home-kpi-wrap">
         <dl className="home-kpi-band" aria-label="Registry summary">
