@@ -90,7 +90,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
       ? 'INVESTOR'
       : currentRoute === 'dashboard'
         ? 'VIEWER'
-        : currentRoute === 'admin' && user.roles.includes('ADMIN')
+        : currentRoute.startsWith('admin') && user.roles.includes('ADMIN')
           ? 'ADMIN'
           : primaryRole;
   const roleLabel = user.roles && user.roles.length > 0 ? user.roles.join(' · ') : 'VIEWER';
@@ -196,8 +196,8 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   </svg>
                 </div>
                 <div className="menu-item-labels">
-                  <span className="menu-item-title">Admin Review Queue</span>
-                  <span className="menu-item-sub">Review submitted platform pitches</span>
+                  <span className="menu-item-title">Admin Console</span>
+                  <span className="menu-item-sub">Moderation, historical registry & imports</span>
                 </div>
               </button>
             )}

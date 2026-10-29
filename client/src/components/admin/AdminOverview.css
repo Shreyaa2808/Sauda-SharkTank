@@ -8,6 +8,18 @@
   gap: 28px;
 }
 
+.overview-error-banner {
+  background-color: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #EF4444;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* Primary Action Hero Card */
 .overview-hero-card {
   background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);

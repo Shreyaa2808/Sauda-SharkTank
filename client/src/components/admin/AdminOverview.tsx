@@ -63,6 +63,14 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({ onNavigate }) => {
         setRecentImports([]);
       }
 
+      if (
+        reviewRes.status === 'rejected' &&
+        healthRes.status === 'rejected' &&
+        statsRes.status === 'rejected'
+      ) {
+        setError('Unable to load operational telemetry from server. Check that backend is running.');
+      }
+
       setLoading(false);
     }
 
@@ -78,6 +86,12 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({ onNavigate }) => {
 
   return (
     <div className="admin-overview-container">
+      {error && (
+        <div className="overview-error-banner" role="alert">
+          <span>⚠</span>
+          <span>{error}</span>
+        </div>
+      )}
       {/* Primary Action Card: Pitch Reviews Queue */}
       <section className="overview-hero-card" aria-labelledby="overview-queue-title">
         <div className="hero-card-content">
