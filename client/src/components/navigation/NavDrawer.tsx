@@ -4,6 +4,7 @@ import './NavDrawer.css';
 
 export type DrawerRoute =
   | 'discovery'
+  | 'archive'
   | 'dashboard'
   | 'founder'
   | 'investor'
@@ -31,6 +32,7 @@ const FOCUSABLE =
 
 const ROUTE_PATHS: Record<DrawerRoute, string> = {
   discovery: '/',
+  archive: '/archive',
   dashboard: '/dashboard',
   founder: '/founder',
   investor: '/investor',
@@ -41,11 +43,13 @@ const ROUTE_PATHS: Record<DrawerRoute, string> = {
 };
 
 /* Clean inline SVG icons (no icon dependency). */
-const Icon: React.FC<{ name: 'discover' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'profile' | 'settings' | 'admin' | 'workspaces' | 'signin' | 'signout' | 'close' }> = ({ name }) => {
+const Icon: React.FC<{ name: 'discover' | 'archive' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'profile' | 'settings' | 'admin' | 'workspaces' | 'signin' | 'signout' | 'close' }> = ({ name }) => {
   const common = { width: 18, height: 18, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
   switch (name) {
     case 'discover':
       return (<svg {...common}><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>);
+    case 'archive':
+      return (<svg {...common}><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M2 8h16" /><path d="M9 12h2" /></svg>);
     case 'dashboard':
       return (<svg {...common}><rect x="3" y="3" width="5.5" height="5.5" rx="1" /><rect x="11.5" y="3" width="5.5" height="5.5" rx="1" /><rect x="3" y="11.5" width="5.5" height="5.5" rx="1" /><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1" /></svg>);
     case 'founder':
@@ -212,6 +216,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
             <p className="nav-drawer-section-label">Navigate</p>
             <ul className="nav-drawer-list">
               {renderLink('discovery', 'Startup Discovery', 'discover')}
+              {renderLink('archive', 'Shark Tank Archive', 'archive', 'Broadcast seasons, episodes & deals')}
               {currentUser && renderLink('dashboard', 'Dashboard', 'dashboard', 'Your workspace overview')}
               {currentUser && hasFounder && renderLink('founder', 'Founder Workspace', 'founder')}
               {currentUser && hasInvestor && renderLink('investor', 'Investor Deal Room', 'investor')}

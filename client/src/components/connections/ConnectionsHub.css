@@ -447,6 +447,93 @@
   padding: 14px 20px;
   border-radius: 8px;
   font-size: 0.9rem;
+  flex: 1;
+}
+
+.pending-investor-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-withdraw-req {
+  background: transparent;
+  border: 1px solid #f87171;
+  color: #dc2626;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-withdraw-req:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+.withdraw-modal-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.withdraw-reason-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.withdraw-reason-field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.withdraw-reason-field input {
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
+.withdraw-reason-field input:focus {
+  border-color: #dc2626;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.btn-confirm-withdraw {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-confirm-withdraw:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-confirm-withdraw:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Conversation Thread View */

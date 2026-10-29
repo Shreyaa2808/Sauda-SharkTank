@@ -19,6 +19,8 @@ interface ViewerDashboardProps {
   onOpenWorkspaces: () => void;
   onNavigateToFounder: () => void;
   onNavigateToInvestor: () => void;
+  onNavigateToArchive?: (tab?: 'seasons' | 'pitches' | 'sharks' | 'statistics') => void;
+  onOpenCompare?: () => void;
 }
 
 const countLabel = (value: number, capped: boolean) => `${value.toLocaleString('en-IN')}${capped ? '+' : ''}`;
@@ -37,6 +39,8 @@ export const ViewerDashboard: React.FC<ViewerDashboardProps> = ({
   onOpenWorkspaces,
   onNavigateToFounder,
   onNavigateToInvestor,
+  onNavigateToArchive,
+  onOpenCompare,
 }) => {
   const firstName = currentUser.fullName.trim().split(/\s+/)[0] || 'there';
   const latestStartups = startups.slice(0, 4);
@@ -47,6 +51,22 @@ export const ViewerDashboard: React.FC<ViewerDashboardProps> = ({
     return countLabel(value, isCapped && value === metrics.totalCount);
   };
 
+  const handleOpenArchive = (tab: 'seasons' | 'pitches' | 'sharks' | 'statistics' = 'seasons') => {
+    if (onNavigateToArchive) {
+      onNavigateToArchive(tab);
+    } else {
+      onNavigateToDiscovery();
+    }
+  };
+
+  const handleOpenCompare = () => {
+    if (onOpenCompare) {
+      onOpenCompare();
+    } else {
+      onNavigateToDiscovery();
+    }
+  };
+
   return (
     <section className="viewer-dashboard" aria-labelledby="viewer-dashboard-title">
       <div className="viewer-dashboard-inner">
@@ -54,12 +74,63 @@ export const ViewerDashboard: React.FC<ViewerDashboardProps> = ({
           <div>
             <p className="vd-eyebrow"><span /> VIEWER DASHBOARD</p>
             <h1 id="viewer-dashboard-title">Welcome back, {firstName}.</h1>
-            <p className="vd-intro">Your starting point for discovering promising ventures and exploring the Sauda registry.</p>
+            <p className="vd-intro">Your starting point for discovering promising ventures, exploring broadcast archives, and evaluating startups.</p>
           </div>
           <button type="button" className="vd-primary-action" onClick={onNavigateToDiscovery}>
             Explore the registry <span aria-hidden="true">↗</span>
           </button>
         </header>
+
+        {/* Discovery & Research Action Cards */}
+        <div className="vd-action-cards-grid" aria-label="Viewer Discovery Hub">
+          <div className="vd-action-card">
+            <span className="vd-action-icon" aria-hidden="true">⌕</span>
+            <div className="vd-action-body">
+              <span className="vd-action-tag">VENTURE REGISTRY</span>
+              <h3>Startup Explorer</h3>
+              <p>Browse and filter published platform opportunities and broadcast pitches.</p>
+              <button type="button" className="vd-action-link" onClick={onNavigateToDiscovery}>
+                Open Explorer <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="vd-action-card">
+            <span className="vd-action-icon gold" aria-hidden="true">📺</span>
+            <div className="vd-action-body">
+              <span className="vd-action-tag gold">BROADCAST VAULT</span>
+              <h3>Shark Tank Archive</h3>
+              <p>Browse televised seasons, episode rosters, and verified deal outcomes.</p>
+              <button type="button" className="vd-action-link gold" onClick={() => handleOpenArchive('seasons')}>
+                Open Archive <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="vd-action-card">
+            <span className="vd-action-icon cyan" aria-hidden="true">🦈</span>
+            <div className="vd-action-body">
+              <span className="vd-action-tag cyan">INVESTOR DIRECTORY</span>
+              <h3>Sharks Roster</h3>
+              <p>Explore resident and guest Sharks, chair seating, and deals evaluated.</p>
+              <button type="button" className="vd-action-link cyan" onClick={() => handleOpenArchive('sharks')}>
+                View Roster <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="vd-action-card">
+            <span className="vd-action-icon purple" aria-hidden="true">⚖</span>
+            <div className="vd-action-body">
+              <span className="vd-action-tag purple">ANALYSIS MATRIX</span>
+              <h3>Startup Comparison</h3>
+              <p>Evaluate 2 or 3 ventures side-by-side with authoritative database comparison.</p>
+              <button type="button" className="vd-action-link purple" onClick={handleOpenCompare}>
+                Compare Ventures <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div className="vd-metrics" aria-label="Registry overview">
           <article className="vd-metric-card">

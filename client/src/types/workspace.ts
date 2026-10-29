@@ -55,6 +55,47 @@ export interface FounderMetrics {
   submittedCount: number;
   publishedCount: number;
   rejectedCount: number;
+  archivedCount?: number;
+}
+
+export interface ArchiveSummary {
+  withdrawnRequests: number;
+  endedConnections: number;
+}
+
+export interface FounderProfileData {
+  founderId?: number;
+  userId?: number;
+  firstName: string;
+  lastName: string | null;
+  gender: string | null;
+  dateOfBirth: string | null;
+  phoneNumber: string | null;
+  highestEducation: string | null;
+  priorStartupsCount: number;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+}
+
+export interface InvestorProfileData {
+  investorId?: number;
+  userId?: number;
+  firstName: string;
+  lastName: string | null;
+  displayName: string | null;
+  investmentFirmName: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  primaryIndustryId: number | null;
+  netWorth: number | null;
+  biography: string | null;
+  minInvestmentAmount: number | null;
+  maxInvestmentAmount: number | null;
+  isAcceptingPitches: boolean;
+  industryPreferences?: number[];
+  stagePreferences?: number[];
 }
 
 export interface CreatePitchPayload {
@@ -132,6 +173,7 @@ export interface ConnectionRequestItem {
   statusReason: string | null;
   createdAt: string;
   respondedAt: string | null;
+  withdrawnAt: string | null;
   endedAt: string | null;
   conversationId: number | null;
   conversationStatus: 'OPEN' | 'READ_ONLY' | null;
