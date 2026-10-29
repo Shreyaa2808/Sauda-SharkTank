@@ -949,3 +949,18 @@
   outline: 2px solid #C3A064;
   outline-offset: 2px;
 }
+
+/* The hub is a dark design: give the whole page a matching dark backdrop
+   so the light page background no longer washes out headings and buttons. */
+.app-shell:has(.connections-hub-container) {
+  background:
+    radial-gradient(60% 40% at 15% 0%, rgba(195, 160, 100, 0.10), transparent 70%),
+    linear-gradient(180deg, #0A1C2C 0%, #050E18 100%);
+  min-height: 100vh;
+}
+
+.connections-title { color: #FFFFFF; }
+.connections-subtitle { color: rgba(237, 243, 247, 0.72); }
+
+/* The route label next to the logo was truncated to "CONN…" and repeats the page title. */
+.topbar--connections .topbar-context-label { display: none; }
