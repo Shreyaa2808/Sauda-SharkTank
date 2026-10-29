@@ -1,0 +1,4 @@
+{
+  "002": "Superseded by migration 004 (append-only pitch_review_event history). A static scan of server/src and client/src found no runtime consumer of pitch.updated_at or pitch.review_note. The only runtime review_note reads/writes target pitch_review_event, not pitch. The updated_at column proposed here is not consumed by the current application. Keep this original draft file unchanged for historical reference; the runner must skip it. This does not approve or apply migration 004.",
+  "003": "user_saved_pitch already exists in the original schema (with an extra private_notes column and non-cascading foreign keys), as shown in the 2026-10-27 schema export. The draft DDL would fail on a database that has the table and would not match the real table. See docs/phase-2-schema-reconciliation.md."
+}

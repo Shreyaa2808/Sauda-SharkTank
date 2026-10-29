@@ -9,6 +9,7 @@ import type {
   ConnectionRequestItem,
   ConversationDetail,
   ChatMessageItem,
+  FounderReviewEvent,
 } from '../types/workspace.ts';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -92,6 +93,21 @@ export async function fetchFounderDashboard(signal?: AbortSignal): Promise<{
     metrics: data.metrics,
     pitches: data.pitches || [],
   };
+}
+
+export async function fetchFounderPitchReviewHistory(
+  pitchId: number,
+  signal?: AbortSignal,
+): Promise<FounderReviewEvent[]> {
+  const res = await fetch(`${API_BASE_URL}/api/founder/pitches/${pitchId}/reviews`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `Failed to fetch review feedback: ${res.status}`);
+  return Array.isArray(data.history) ? data.history as FounderReviewEvent[] : [];
 }
 
 export async function createFounderPitch(

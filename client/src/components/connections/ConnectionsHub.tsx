@@ -269,11 +269,11 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
       <div className="connections-header">
         <div>
           <div className="connections-crest-label">
-            <span className="connections-crest-dot" /> VERIFIED VENTURE CONNECTIONS
+            <span className="connections-crest-dot" /> VENTURE CONNECTIONS
           </div>
           <h1 className="connections-title">Connections & Conversations.</h1>
           <p className="connections-subtitle">
-            Direct communication hub between verified founders and accredited investors.
+            Direct communication hub between founders and investors on Sauda.
           </p>
         </div>
         <button
@@ -355,7 +355,18 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                   <div
                     key={item.requestId}
                     className={`conn-list-item ${isSelected ? 'selected' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    aria-label={`${item.brandName}, ${item.requestStatus.toLowerCase()}, with ${counterpart.name}`}
                     onClick={() => handleSelectRequest(item)}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleSelectRequest(item);
+                      }
+                    }}
                   >
                     <div className="item-top-row">
                       <span className="item-venture-name">{item.brandName}</span>
@@ -404,7 +415,6 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                 <div className="party-block">
                   <span className="party-role">Investor Requester</span>
                   <span className="party-name">{selectedRequest.investorName}</span>
-                  <span className="party-email">{selectedRequest.investorEmail}</span>
                   {selectedRequest.investorFirmName && (
                     <span className="party-firm">Firm: {selectedRequest.investorFirmName}</span>
                   )}
@@ -413,7 +423,6 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                 <div className="party-block">
                   <span className="party-role">Recipient Founder</span>
                   <span className="party-name">{selectedRequest.founderName}</span>
-                  <span className="party-email">{selectedRequest.founderEmail}</span>
                 </div>
               </div>
 

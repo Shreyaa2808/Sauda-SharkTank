@@ -158,11 +158,11 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
       <div className="investor-header">
         <div className="investor-header-content">
           <div className="investor-crest-label">
-            <span className="investor-crest-dot" /> INSTITUTIONAL INVESTOR DEAL ROOM
+            <span className="investor-crest-dot" /> INVESTOR WORKSPACE · DEAL FLOW
           </div>
-          <h1 className="investor-title">Syndicated Venture Flow.</h1>
+          <h1 className="investor-title">Your Deal Room.</h1>
           <p className="investor-subtitle">
-            Evaluate standardized founder proposals, historical TV pitches, and initiate direct introduction requests with verified ventures.
+            Discover published ventures, compare funding asks, build your watchlist, and connect with founders.
           </p>
         </div>
         <div className="investor-header-actions">
@@ -176,26 +176,26 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
 
       {/* KPI Stats Ribbon */}
       <div className="investor-kpi-ribbon">
-        <div className="investor-kpi-card" onClick={() => { setSelectedSource('ALL'); setSavedOnly(false); }}>
+        <button type="button" className={`investor-kpi-card ${selectedSource === 'ALL' && !savedOnly ? 'selected' : ''}`} aria-pressed={selectedSource === 'ALL' && !savedOnly} onClick={() => { setSelectedSource('ALL'); setSavedOnly(false); }}>
           <span className="kpi-label">Total Published Deals</span>
           <span className="kpi-number">{metrics ? metrics.totalPublishedCount : '—'}</span>
           <span className="kpi-sub">Dual-source deal registry</span>
-        </div>
-        <div className={`investor-kpi-card ${selectedSource === 'PLATFORM' && !savedOnly ? 'selected' : ''}`} onClick={() => { setSelectedSource('PLATFORM'); setSavedOnly(false); }}>
+        </button>
+        <button type="button" className={`investor-kpi-card ${selectedSource === 'PLATFORM' && !savedOnly ? 'selected' : ''}`} aria-pressed={selectedSource === 'PLATFORM' && !savedOnly} onClick={() => { setSelectedSource('PLATFORM'); setSavedOnly(false); }}>
           <span className="kpi-label">Platform Direct Listings</span>
           <span className="kpi-number gold">{metrics ? metrics.publishedPlatformCount : '—'}</span>
           <span className="kpi-sub">Direct founder connect eligible</span>
-        </div>
-        <div className={`investor-kpi-card ${selectedSource === 'SHOW' && !savedOnly ? 'selected' : ''}`} onClick={() => { setSelectedSource('SHOW'); setSavedOnly(false); }}>
+        </button>
+        <button type="button" className={`investor-kpi-card ${selectedSource === 'SHOW' && !savedOnly ? 'selected' : ''}`} aria-pressed={selectedSource === 'SHOW' && !savedOnly} onClick={() => { setSelectedSource('SHOW'); setSavedOnly(false); }}>
           <span className="kpi-label">Television Pitches</span>
           <span className="kpi-number blue">{metrics ? metrics.publishedShowCount : '—'}</span>
           <span className="kpi-sub">Broadcasted show history</span>
-        </div>
-        <div className={`investor-kpi-card ${savedOnly ? 'selected' : ''}`} onClick={() => setSavedOnly(!savedOnly)}>
+        </button>
+        <button type="button" className={`investor-kpi-card ${savedOnly ? 'selected' : ''}`} aria-pressed={savedOnly} onClick={() => setSavedOnly(!savedOnly)}>
           <span className="kpi-label">Saved to Watchlist</span>
           <span className="kpi-number teal">{metrics ? metrics.savedPitchesCount : '—'}</span>
           <span className="kpi-sub">Bookmarked ventures</span>
-        </div>
+        </button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -513,7 +513,7 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
             </div>
 
             <p className="connect-modal-desc">
-              Send a verified connection proposal to <strong>{connectPitch.founderName || 'Founder'}</strong> for{' '}
+              Send a connection proposal to <strong>{connectPitch.founderName || 'Founder'}</strong> for{' '}
               <strong>{connectPitch.brandName}</strong>. If accepted, a private conversation thread will be opened.
             </p>
 

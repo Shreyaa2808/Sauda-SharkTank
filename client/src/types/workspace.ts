@@ -39,6 +39,16 @@ export interface FounderPitch {
   submittedAt: string;
 }
 
+export interface FounderReviewEvent {
+  reviewEventId: number;
+  pitchId: number;
+  decision: 'PUBLISH' | 'REJECT';
+  reviewNote: string | null;
+  decidedAt: string;
+  reviewerUserId: number;
+  reviewerName: string;
+}
+
 export interface FounderMetrics {
   totalCount: number;
   draftCount: number;
@@ -114,11 +124,9 @@ export interface ConnectionRequestItem {
   industryName: string | null;
   investorUserId: number;
   investorName: string;
-  investorEmail: string;
   investorFirmName: string | null;
   founderUserId: number;
   founderName: string;
-  founderEmail: string;
   requestStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN' | 'ENDED';
   initialMessage: string | null;
   statusReason: string | null;
@@ -148,7 +156,6 @@ export interface ConversationDetail {
   brandName: string;
   counterpartUserId: number;
   counterpartName: string;
-  counterpartEmail: string;
   counterpartRole: 'FOUNDER' | 'INVESTOR';
   messages: ChatMessageItem[];
 }

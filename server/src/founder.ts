@@ -557,6 +557,7 @@ export async function updateFounderPitch(
   userId: number,
   pitchId: number,
   payload: Partial<CreatePitchPayload>,
+  isAdmin = false,
 ): Promise<FounderResult<{ pitch: FounderPitch }>> {
   if (!isPlainObject(payload)) {
     return fail(400, 'INVALID_BODY', 'A JSON pitch object is required.');
@@ -595,9 +596,15 @@ export async function updateFounderPitch(
     }
 
     // Authoritative owner of a PLATFORM pitch is pitch.submitted_by_user_id.
-    if (Number(existing.submitted_by_user_id) !== userId) {
+    // The separate Admin correction route may edit another user's PLATFORM listing,
+    // but it does not permit editing SHOW records or changing pitch status.
+    if (!isAdmin && Number(existing.submitted_by_user_id) !== userId) {
       await conn.rollback();
       return fail(403, 'UNAUTHORIZED_OWNER', 'You are not authorized to modify pitches submitted by other users.');
+    }
+    if (isAdmin && payload.pitchStatus !== undefined) {
+      await conn.rollback();
+      return fail(400, 'ADMIN_STATUS_CHANGE_FORBIDDEN', 'Use the review-decision or archive endpoint to change a listing status.');
     }
 
     const target = parseTargetStatus(payload.pitchStatus);
@@ -608,17 +615,22 @@ export async function updateFounderPitch(
 
     // --- lifecycle rules ---
     const current = existing.pitch_status as PitchStatus;
-    let nextStatus: 'DRAFT' | 'SUBMITTED';
+    let nextStatus: PitchStatus;
 
-    if (current === 'PUBLISHED') {
+    if (isAdmin && (current === 'PUBLISHED' || current === 'DRAFT' || current === 'REJECTED')) {
+      // Admin correction preserves current state. Review and archive remain separate operations.
+      nextStatus = current;
+    } else if (current === 'PUBLISHED') {
       await conn.rollback();
-      return fail(409, 'PITCH_PUBLISHED_LOCKED', 'A published pitch is live and cannot be edited.');
-    }
-    if (current === 'ARCHIVED') {
+      return fail(409, 'PITCH_PUBLISHED_LOCKED', 'A published pitch is live and cannot be edited by its owner.');
+    } else if (current === 'ARCHIVED') {
       await conn.rollback();
       return fail(409, 'PITCH_ARCHIVED_LOCKED', 'An archived pitch cannot be edited.');
-    }
-    if (current === 'SUBMITTED') {
+    } else if (current === 'SUBMITTED') {
+      if (isAdmin) {
+        await conn.rollback();
+        return fail(409, 'PITCH_UNDER_REVIEW', 'A submitted pitch must be decided in the review queue before correction.');
+      }
       if (target.status !== 'DRAFT') {
         await conn.rollback();
         return fail(
@@ -629,7 +641,7 @@ export async function updateFounderPitch(
       }
       nextStatus = 'DRAFT';
     } else {
-      // DRAFT or REJECTED: stay/become DRAFT unless explicitly submitting.
+      // Owner edits: DRAFT or REJECTED becomes DRAFT unless explicitly resubmitted.
       nextStatus = target.status ?? 'DRAFT';
     }
 
@@ -699,6 +711,11 @@ export async function updateFounderPitch(
     // --- pitch columns ---
     const pitchSets: string[] = ['pitch_status = ?'];
     const pitchParams: Array<string | number | null> = [nextStatus];
+    // The review queue uses submitted_at as the submission timestamp. Refresh it
+    // only on a transition into SUBMITTED (including resubmission after rejection).
+    if (nextStatus === 'SUBMITTED' && current !== 'SUBMITTED') {
+      pitchSets.push('submitted_at = CURRENT_TIMESTAMP');
+    }
     if (values.originalAskAmount !== undefined) {
       pitchSets.push('original_ask_amount = ?');
       pitchParams.push(values.originalAskAmount);
@@ -739,6 +756,7 @@ export interface ArchiveSummary {
 export async function archiveFounderPitch(
   userId: number,
   pitchId: number,
+  isAdmin = false,
 ): Promise<FounderResult<{ pitch: FounderPitch; summary: ArchiveSummary }>> {
   const conn = await dbPool.getConnection();
   try {
@@ -762,7 +780,7 @@ export async function archiveFounderPitch(
         'Historical Shark Tank television pitches are permanent records and cannot be archived.',
       );
     }
-    if (Number(row.submitted_by_user_id) !== userId) {
+    if (!isAdmin && Number(row.submitted_by_user_id) !== userId) {
       await conn.rollback();
       return fail(403, 'UNAUTHORIZED_OWNER', 'You are not authorized to archive pitches submitted by other users.');
     }

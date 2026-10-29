@@ -7,8 +7,10 @@ export interface WorkspaceChooserModalProps {
   currentUser: AuthUser | null;
   isOpen: boolean;
   onClose: () => void;
-  onSelectWorkspace: (workspace: 'discovery' | 'founder' | 'investor' | 'connections') => void;
+  onSelectWorkspace: (workspace: 'discovery' | 'dashboard' | 'founder' | 'investor' | 'connections') => void;
   onRolesUpdated: (updatedRoles: string[]) => void;
+  /** Current app route lets the chooser clearly identify the open workspace. */
+  currentRoute: string;
 }
 
 export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
@@ -17,6 +19,7 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
   onClose,
   onSelectWorkspace,
   onRolesUpdated,
+  currentRoute,
 }) => {
   const [activatingRole, setActivatingRole] = useState<'FOUNDER' | 'INVESTOR' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -67,6 +70,10 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
   const roles = currentUser?.roles || ['VIEWER'];
   const hasFounder = roles.includes('FOUNDER');
   const hasInvestor = roles.includes('INVESTOR');
+  const isCurrentViewer = currentRoute === 'dashboard';
+  const isCurrentFounder = currentRoute === 'founder' && hasFounder;
+  const isCurrentInvestor = currentRoute === 'investor' && hasInvestor;
+  const isCurrentConnections = currentRoute === 'connections' && (hasFounder || hasInvestor);
 
   const handleActivate = async (role: 'FOUNDER' | 'INVESTOR') => {
     setErrorMessage(null);
@@ -100,7 +107,7 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
           Choose your workspace.
         </h2>
         <p className="workspace-modal-sub">
-          Select an authorized environment or activate specialized founder and investor tools for your account.
+          Switch between your available dashboards, or activate Founder or Investor access for your account.
         </p>
 
         {errorMessage && (
@@ -111,8 +118,8 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
 
         <div className="workspace-cards-grid">
           {/* 1. VIEWER WORKSPACE */}
-          <div className="workspace-card active-card">
-            <div className="workspace-card-badge authorized">ACTIVE FOR ALL</div>
+          <div className={`workspace-card ${isCurrentViewer ? 'current-card' : 'available-card'}`}>
+            <div className={`workspace-card-badge ${isCurrentViewer ? 'current' : 'available'}`}>{isCurrentViewer ? 'CURRENT WORKSPACE' : 'AVAILABLE'}</div>
             <div className="workspace-card-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="28" height="28">
                 <circle cx="12" cy="12" r="9" />
@@ -122,26 +129,27 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
             </div>
             <h3 className="workspace-card-title">Viewer Workspace</h3>
             <p className="workspace-card-desc">
-              Explore published venture listings, evaluate deal telemetry, and analyze historical show pitches.
+              Explore published venture listings, discover new ideas, and open venture details.
             </p>
             <div className="workspace-card-footer">
               <button
                 type="button"
-                className="workspace-action-btn primary"
+                className={`workspace-action-btn primary ${isCurrentViewer ? 'current-workspace-action' : ''}`}
+                disabled={isCurrentViewer}
                 onClick={() => {
-                  onSelectWorkspace('discovery');
+                  onSelectWorkspace('dashboard');
                   onClose();
                 }}
               >
-                Enter Discovery →
+                {isCurrentViewer ? 'Current Workspace ✓' : 'Switch to Viewer Dashboard →'}
               </button>
             </div>
           </div>
 
           {/* 2. FOUNDER WORKSPACE */}
-          <div className={`workspace-card ${hasFounder ? 'active-card' : ''}`}>
-            <div className={`workspace-card-badge ${hasFounder ? 'authorized' : 'available'}`}>
-              {hasFounder ? 'AUTHORIZED' : 'SELF-SERVICE ACTIVATION'}
+          <div className={`workspace-card ${hasFounder ? 'active-card' : ''} ${isCurrentFounder ? 'current-card' : ''}`}>
+            <div className={`workspace-card-badge ${isCurrentFounder ? 'current' : hasFounder ? 'authorized' : 'available'}`}>
+              {isCurrentFounder ? 'CURRENT WORKSPACE' : hasFounder ? 'AVAILABLE TO YOU' : 'ACTIVATE ACCESS'}
             </div>
             <div className="workspace-card-icon gold-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="28" height="28">
@@ -157,13 +165,14 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
               {hasFounder ? (
                 <button
                   type="button"
-                  className="workspace-action-btn primary"
+                  className={`workspace-action-btn primary ${isCurrentFounder ? 'current-workspace-action' : ''}`}
+                  disabled={isCurrentFounder}
                   onClick={() => {
                     onSelectWorkspace('founder');
                     onClose();
                   }}
                 >
-                  Enter Founder Suite →
+                  {isCurrentFounder ? 'Current Workspace ✓' : 'Switch to Founder Suite →'}
                 </button>
               ) : (
                 <button
@@ -179,9 +188,9 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
           </div>
 
           {/* 3. INVESTOR WORKSPACE */}
-          <div className={`workspace-card ${hasInvestor ? 'active-card' : ''}`}>
-            <div className={`workspace-card-badge ${hasInvestor ? 'authorized' : 'available'}`}>
-              {hasInvestor ? 'AUTHORIZED' : 'SELF-SERVICE ACTIVATION'}
+          <div className={`workspace-card ${hasInvestor ? 'active-card' : ''} ${isCurrentInvestor ? 'current-card' : ''}`}>
+            <div className={`workspace-card-badge ${isCurrentInvestor ? 'current' : hasInvestor ? 'authorized' : 'available'}`}>
+              {isCurrentInvestor ? 'CURRENT WORKSPACE' : hasInvestor ? 'AVAILABLE TO YOU' : 'ACTIVATE ACCESS'}
             </div>
             <div className="workspace-card-icon blue-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="28" height="28">
@@ -198,13 +207,14 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
               {hasInvestor ? (
                 <button
                   type="button"
-                  className="workspace-action-btn primary"
+                  className={`workspace-action-btn primary ${isCurrentInvestor ? 'current-workspace-action' : ''}`}
+                  disabled={isCurrentInvestor}
                   onClick={() => {
                     onSelectWorkspace('investor');
                     onClose();
                   }}
                 >
-                  Enter Deal Room →
+                  {isCurrentInvestor ? 'Current Workspace ✓' : 'Switch to Deal Room →'}
                 </button>
               ) : (
                 <button
@@ -221,7 +231,7 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
         </div>
 
         {(hasFounder || hasInvestor) && (
-          <div className="workspace-connections-shortcut">
+          <div className={`workspace-connections-shortcut ${isCurrentConnections ? 'is-current' : ''}`}>
             <div className="shortcut-info">
               <span className="shortcut-title">Connections & Direct Inquiries</span>
               <span className="shortcut-desc">Manage inbound investor requests and accepted founder conversations.</span>
@@ -229,12 +239,13 @@ export const WorkspaceChooserModal: React.FC<WorkspaceChooserModalProps> = ({
             <button
               type="button"
               className="workspace-shortcut-btn"
+              disabled={isCurrentConnections}
               onClick={() => {
                 onSelectWorkspace('connections');
                 onClose();
               }}
             >
-              Open Connections Hub →
+              {isCurrentConnections ? 'Current: Connections Hub ✓' : 'Open Connections Hub →'}
             </button>
           </div>
         )}

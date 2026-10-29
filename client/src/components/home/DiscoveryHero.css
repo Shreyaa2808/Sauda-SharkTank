@@ -730,3 +730,119 @@
     transition: none;
   }
 }
+
+/* Floating dark-glass KPI cards connect the hero to the rest of the page. */
+.home-kpi-wrap {
+  max-width: 1320px;
+  margin: clamp(24px, 4vh, 46px) auto 0;
+  padding-bottom: clamp(20px, 3vh, 34px);
+}
+
+.home-kpi-band {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.home-kpi {
+  padding: clamp(16px, 2.4vh, 22px) clamp(14px, 1.8vw, 24px);
+  border: 1px solid rgba(181, 205, 221, 0.18);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(17, 40, 58, 0.9), rgba(6, 20, 32, 0.94));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.home-kpi:hover {
+  transform: translateY(-2px);
+  border-color: rgba(213, 183, 121, 0.4);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.home-kpi + .home-kpi {
+  border-left: 1px solid rgba(181, 205, 221, 0.18);
+}
+
+.home-kpi dt {
+  color: #91A8BA;
+}
+
+.home-kpi-value,
+.home-kpi-split b {
+  color: #F5F3EE;
+}
+
+.home-kpi-split {
+  color: #AFC1CF;
+}
+
+.home-kpi-sub {
+  color: #91A8BA;
+}
+
+.home-kpi-bar {
+  background: rgba(22, 141, 164, 0.22);
+}
+
+.home-kpi-bar span {
+  background: linear-gradient(90deg, #C3A064, #E0C797);
+}
+
+@media (max-width: 960px) {
+  .home-kpi-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .home-kpi + .home-kpi {
+    border-left: 1px solid rgba(181, 205, 221, 0.18);
+  }
+
+  .home-kpi:nth-child(n + 3) {
+    border-top: 1px solid rgba(181, 205, 221, 0.18);
+  }
+}
+
+@media (max-width: 480px) {
+  .home-kpi-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .home-kpi {
+    padding: 14px 12px;
+  }
+
+  .home-kpi dt {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+
+  .home-kpi-value {
+    font-size: 26px;
+  }
+
+  .home-kpi-split {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .home-kpi-split b {
+    font-size: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-kpi {
+    transition: none;
+  }
+
+  .home-kpi:hover {
+    transform: none;
+  }
+}

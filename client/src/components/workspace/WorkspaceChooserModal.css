@@ -333,3 +333,43 @@
     justify-content: center;
   }
 }
+
+/* Current-workspace state: make switching explicit without implying that
+   an already-authorized role is a separate account or requires re-sign-in. */
+.workspace-card.current-card {
+  border-color: rgba(195, 160, 100, 0.72);
+  background: linear-gradient(155deg, rgba(195, 160, 100, 0.13), rgba(10, 39, 71, 0.58) 58%);
+  box-shadow: inset 0 0 0 1px rgba(195, 160, 100, 0.08), 0 0 24px rgba(195, 160, 100, 0.08);
+}
+
+.workspace-card-badge.current {
+  background: rgba(195, 160, 100, 0.2);
+  color: #F7DFAE;
+  border: 1px solid rgba(195, 160, 100, 0.62);
+}
+
+.workspace-action-btn.current-workspace-action:disabled {
+  opacity: 1;
+  cursor: default;
+  background: rgba(195, 160, 100, 0.13);
+  border-color: rgba(195, 160, 100, 0.4);
+  color: #F3E7CA;
+  box-shadow: none;
+}
+
+.workspace-connections-shortcut.is-current {
+  background: rgba(195, 160, 100, 0.09);
+  border-color: rgba(195, 160, 100, 0.42);
+}
+
+.workspace-connections-shortcut.is-current .shortcut-title {
+  color: #E7C889;
+}
+
+.workspace-shortcut-btn:disabled {
+  opacity: 0.8;
+  cursor: default;
+  border-color: rgba(195, 160, 100, 0.48);
+  color: #E7C889;
+  background: rgba(195, 160, 100, 0.08);
+}

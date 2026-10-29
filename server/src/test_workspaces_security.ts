@@ -1,14 +1,25 @@
 import { dbPool } from './db.js';
 import { signSession } from './auth.js';
 import type { RowDataPacket } from 'mysql2';
+import { assertIntegrationTargetSafe, verifyConnectedDatabase } from './testSafetyGuards.js';
 
-const API_BASE = 'http://localhost:4000/api';
+let safeTarget: { dbName: string; apiUrl?: string };
+try {
+  safeTarget = assertIntegrationTargetSafe({
+    optInEnvVar: 'SAUDA_RUN_WORKSPACE_SECURITY_TESTS',
+    requireApiUrl: true,
+  });
+} catch {
+  process.exit(1);
+}
+const API_BASE = safeTarget.apiUrl!;
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function runTests() {
+  await verifyConnectedDatabase(dbPool, safeTarget.dbName);
   console.log('====================================================');
   console.log('SAUDA BACKEND WORKSPACE & SECURITY INTEGRATION SUITE');
   console.log('====================================================\n');
@@ -141,9 +152,24 @@ async function runTests() {
   });
   assert(intruderFounderRes.status === 403, 'Intruder without FOUNDER role rejected (403)');
 
-  // A valid stage is required before a pitch can be submitted for review
+  // A valid industry and stage are required before a pitch can be submitted for review
+  const [indRows] = await dbPool.execute<RowDataPacket[]>(`SELECT industry_id FROM industry ORDER BY industry_id LIMIT 1`);
+  let testIndustryId: number;
+  if (indRows.length === 0) {
+    const [indRes] = await dbPool.execute<any>(`INSERT INTO industry (industry_name) VALUES ('Test Industry')`);
+    testIndustryId = indRes.insertId;
+  } else {
+    testIndustryId = Number(indRows[0].industry_id);
+  }
+
   const [stageRows] = await dbPool.execute<RowDataPacket[]>(`SELECT stage_id FROM startup_stage ORDER BY stage_id LIMIT 1`);
-  const testStageId = Number(stageRows[0]?.stage_id ?? 1);
+  let testStageId: number;
+  if (stageRows.length === 0) {
+    const [stgRes] = await dbPool.execute<any>(`INSERT INTO startup_stage (stage_name) VALUES ('Test Stage')`);
+    testStageId = stgRes.insertId;
+  } else {
+    testStageId = Number(stageRows[0].stage_id);
+  }
 
   // Founder create pitch (DRAFT)
   const createDraftRes = await fetch(`${API_BASE}/founder/pitches`, {
@@ -152,7 +178,7 @@ async function runTests() {
     body: JSON.stringify({
       brandName: 'Quantum Solar Tech',
       legalBusinessName: 'Quantum Solar Private Limited',
-      industryId: 4, // Sustainable Packaging / Clean Energy
+      industryId: testIndustryId,
       stageId: testStageId,
       pitchHook: 'Next-generation solid-state solar thermal cells with 42% efficiency.',
       businessModel: 'B2B Enterprise',
@@ -163,6 +189,9 @@ async function runTests() {
       pitchStatus: 'DRAFT',
     }),
   });
+  if (createDraftRes.status !== 201) {
+    console.error('createDraftRes failed:', createDraftRes.status, await createDraftRes.clone().json());
+  }
   assert(createDraftRes.status === 201, 'Founder created DRAFT pitch (201)');
   const createDraftJson = await createDraftRes.json();
   const testPitchId = createDraftJson.pitchId;
@@ -251,7 +280,21 @@ async function runTests() {
 
   // 8. Connection & Messaging Lifecycle
   console.log('\n--- 8. CONNECTION & MESSAGING LIFECYCLE ---');
-  // Clean any prior test request between these two
+  // Clean prior rows for these explicitly named test identities in FK order.
+  // This also makes repeat runs possible when the previous run created a conversation.
+  await dbPool.execute(
+    `DELETE m FROM message m
+     INNER JOIN conversation c ON c.conversation_id = m.conversation_id
+     INNER JOIN connection_request cr ON cr.request_id = c.request_id
+     WHERE cr.investor_user_id = ? AND cr.founder_user_id = ?`,
+    [investorUser.user_id, founderUser.user_id],
+  );
+  await dbPool.execute(
+    `DELETE c FROM conversation c
+     INNER JOIN connection_request cr ON cr.request_id = c.request_id
+     WHERE cr.investor_user_id = ? AND cr.founder_user_id = ?`,
+    [investorUser.user_id, founderUser.user_id],
+  );
   await dbPool.execute(
     `DELETE FROM connection_request WHERE investor_user_id = ? AND founder_user_id = ?`,
     [investorUser.user_id, founderUser.user_id],
@@ -298,12 +341,21 @@ async function runTests() {
   });
   assert(intruderAcceptRes.status === 403, 'Intruder cannot respond to founder connection request (403)');
 
-  // Founder accepts request -> conversation opened!
-  const founderAcceptRes = await fetch(`${API_BASE}/connections/${requestId}/respond`, {
+  // Race two accept decisions. Row locking should allow one transition and
+  // reject the second stale decision without creating a duplicate conversation.
+  const acceptAttempt = () => fetch(`${API_BASE}/connections/${requestId}/respond`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: founderCookie },
     body: JSON.stringify({ action: 'ACCEPT' }),
   });
+  const acceptRaceResponses = await Promise.all([acceptAttempt(), acceptAttempt()]);
+  const acceptedResponses = acceptRaceResponses.filter((response) => response.status === 200);
+  const staleResponses = acceptRaceResponses.filter((response) => response.status === 400);
+  assert(
+    acceptedResponses.length === 1 && staleResponses.length === 1,
+    'Concurrent accept decisions produce exactly one success and one invalid-state response',
+  );
+  const founderAcceptRes = acceptedResponses[0] ?? acceptRaceResponses[0];
   assert(founderAcceptRes.status === 200, 'Founder accepted connection request (200)');
   const founderAcceptJson = await founderAcceptRes.json();
   assert(founderAcceptJson.request.requestStatus === 'ACCEPTED', 'Request status is ACCEPTED');
@@ -340,12 +392,25 @@ async function runTests() {
   });
   assert(intruderSendRes.status === 403, 'Non-participant cannot send message in conversation (403)');
 
-  // End connection
-  const endConnRes = await fetch(`${API_BASE}/connections/${requestId}/end`, {
-    method: 'POST',
-    headers: { Cookie: investorCookie },
-  });
+  // Race a send against ending the connection. A send may succeed if it obtains
+  // the conversation lock first, or be rejected if ending wins; it must not be
+  // inserted after the conversation has transitioned to READ_ONLY.
+  const [endConnRes, racingSendRes] = await Promise.all([
+    fetch(`${API_BASE}/connections/${requestId}/end`, {
+      method: 'POST',
+      headers: { Cookie: investorCookie },
+    }),
+    fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: founderCookie },
+      body: JSON.stringify({ messageBody: 'Message racing connection end.' }),
+    }),
+  ]);
   assert(endConnRes.status === 200, 'Connection ended by participant (200)');
+  assert(
+    racingSendRes.status === 201 || racingSendRes.status === 403,
+    'Concurrent send is either committed before ending or rejected after ending',
+  );
   const endJson = await endConnRes.json();
   assert(endJson.request.requestStatus === 'ENDED', 'Connection status is ENDED');
 
@@ -363,7 +428,11 @@ async function runTests() {
   });
   const retainedMsgsJson = await retainedMsgsRes.json();
   assert(retainedMsgsJson.conversationStatus === 'READ_ONLY', 'Conversation status is READ_ONLY');
-  assert(retainedMsgsJson.messages.length === 2, 'All historical messages retained after connection ended');
+  const expectedRetainedCount = 2 + (racingSendRes.status === 201 ? 1 : 0);
+  assert(
+    retainedMsgsJson.messages.length === expectedRetainedCount,
+    'Only messages committed before the connection ended are retained; the concurrent send is serialized',
+  );
 
   console.log('\n====================================================');
   console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);

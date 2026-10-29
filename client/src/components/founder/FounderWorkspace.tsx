@@ -4,12 +4,14 @@ import type {
   FounderMetrics,
   CreatePitchPayload,
   MetadataCategories,
+  FounderReviewEvent,
 } from '../../types/workspace.ts';
 import {
   fetchFounderDashboard,
   createFounderPitch,
   updateFounderPitch,
   fetchCategories,
+  fetchFounderPitchReviewHistory,
 } from '../../services/workspace.ts';
 import { formatCurrencyINR } from '../../utils/formatters.ts';
 import './FounderWorkspace.css';
@@ -39,6 +41,10 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
   const [editingPitch, setEditingPitch] = useState<FounderPitch | null>(null);
   const [formSubmitting, setFormSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [reviewHistoryPitch, setReviewHistoryPitch] = useState<FounderPitch | null>(null);
+  const [reviewHistory, setReviewHistory] = useState<FounderReviewEvent[]>([]);
+  const [reviewHistoryLoading, setReviewHistoryLoading] = useState(false);
+  const [reviewHistoryError, setReviewHistoryError] = useState<string | null>(null);
 
   // Form Fields
   const [brandName, setBrandName] = useState<string>('');
@@ -109,6 +115,42 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
       ignore = true;
     };
   }, []);
+
+  const openReviewHistory = async (pitch: FounderPitch) => {
+    setReviewHistoryPitch(pitch);
+    setReviewHistory([]);
+    setReviewHistoryError(null);
+    setReviewHistoryLoading(true);
+    try {
+      const history = await fetchFounderPitchReviewHistory(pitch.pitchId);
+      setReviewHistory(history);
+    } catch (err) {
+      setReviewHistoryError(err instanceof Error ? err.message : 'Unable to load review feedback.');
+    } finally {
+      setReviewHistoryLoading(false);
+    }
+  };
+
+  const closeReviewHistory = () => {
+    setReviewHistoryPitch(null);
+    setReviewHistory([]);
+    setReviewHistoryError(null);
+    setReviewHistoryLoading(false);
+  };
+
+  useEffect(() => {
+    if (!reviewHistoryPitch) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setReviewHistoryPitch(null);
+        setReviewHistory([]);
+        setReviewHistoryError(null);
+        setReviewHistoryLoading(false);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [reviewHistoryPitch]);
 
   const openCreateModal = () => {
     setEditingPitch(null);
@@ -257,7 +299,7 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
           </div>
           <h1 className="founder-title">Manage Your Ventures.</h1>
           <p className="founder-subtitle">
-            Draft, review, and register your platform startup listings. Verified pitches connect directly with accredited investors.
+            Build your venture profile, track each pitch’s status, and manage your listings from one workspace.
           </p>
         </div>
         <div className="founder-header-actions">
@@ -274,26 +316,26 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
 
       {/* KPI Stats Ribbon */}
       <div className="founder-kpi-ribbon">
-        <div className="founder-kpi-card" onClick={() => setFilterStatus('ALL')}>
+        <button type="button" className="founder-kpi-card" aria-pressed={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')}>
           <span className="kpi-label">Total Ventures</span>
           <span className="kpi-number">{metrics ? metrics.totalCount : '—'}</span>
-          <span className="kpi-sub">Registered platform listings</span>
-        </div>
-        <div className={`founder-kpi-card ${filterStatus === 'DRAFT' ? 'selected' : ''}`} onClick={() => setFilterStatus('DRAFT')}>
+          <span className="kpi-sub">Your venture listings</span>
+        </button>
+        <button type="button" className={`founder-kpi-card ${filterStatus === 'DRAFT' ? 'selected' : ''}`} aria-pressed={filterStatus === 'DRAFT'} onClick={() => setFilterStatus('DRAFT')}>
           <span className="kpi-label">Drafts in Progress</span>
           <span className="kpi-number amber">{metrics ? metrics.draftCount : '—'}</span>
-          <span className="kpi-sub">Private workspace drafts</span>
-        </div>
-        <div className={`founder-kpi-card ${filterStatus === 'SUBMITTED' ? 'selected' : ''}`} onClick={() => setFilterStatus('SUBMITTED')}>
+          <span className="kpi-sub">Saved, not yet submitted</span>
+        </button>
+        <button type="button" className={`founder-kpi-card ${filterStatus === 'SUBMITTED' ? 'selected' : ''}`} aria-pressed={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')}>
           <span className="kpi-label">Under Review</span>
           <span className="kpi-number blue">{metrics ? metrics.submittedCount : '—'}</span>
-          <span className="kpi-sub">Submitted for registry publish</span>
-        </div>
-        <div className={`founder-kpi-card ${filterStatus === 'PUBLISHED' ? 'selected' : ''}`} onClick={() => setFilterStatus('PUBLISHED')}>
+          <span className="kpi-sub">Awaiting a registry decision</span>
+        </button>
+        <button type="button" className={`founder-kpi-card ${filterStatus === 'PUBLISHED' ? 'selected' : ''}`} aria-pressed={filterStatus === 'PUBLISHED'} onClick={() => setFilterStatus('PUBLISHED')}>
           <span className="kpi-label">Live on Platform</span>
           <span className="kpi-number green">{metrics ? metrics.publishedCount : '—'}</span>
-          <span className="kpi-sub">Discoverable by investors</span>
-        </div>
+          <span className="kpi-sub">Visible in the registry</span>
+        </button>
       </div>
 
       {/* Filter Tabs */}
@@ -405,6 +447,15 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
                 <span className="pitch-timestamp">
                   Registered: {new Date(pitch.submittedAt).toLocaleDateString()}
                 </span>
+                {(pitch.pitchStatus === 'REJECTED' || pitch.pitchStatus === 'PUBLISHED') && (
+                  <button
+                    type="button"
+                    className="pitch-review-feedback-btn"
+                    onClick={() => void openReviewHistory(pitch)}
+                  >
+                    View review history
+                  </button>
+                )}
                 {pitch.pitchStatus !== 'PUBLISHED' && (
                   <button
                     type="button"
@@ -417,6 +468,53 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {reviewHistoryPitch && (
+        <div className="founder-review-modal-overlay" role="presentation" onClick={closeReviewHistory}>
+          <section
+            className="founder-review-modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="founder-review-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="founder-review-modal-header">
+              <div>
+                <span className="founder-crest-label">PITCH REVIEW HISTORY</span>
+                <h2 id="founder-review-modal-title">{reviewHistoryPitch.brandName}</h2>
+              </div>
+              <button type="button" className="founder-review-modal-close" onClick={closeReviewHistory} aria-label="Close review history">×</button>
+            </div>
+            <p className="founder-review-modal-intro">Read the decisions and feedback recorded by Sauda reviewers. You can edit and resubmit a rejected pitch using the existing pitch editor.</p>
+            {reviewHistoryLoading ? (
+              <div className="founder-review-modal-state" role="status">Loading review history…</div>
+            ) : reviewHistoryError ? (
+              <div className="founder-review-modal-error" role="alert">{reviewHistoryError}</div>
+            ) : reviewHistory.length === 0 ? (
+              <div className="founder-review-modal-state">No review events are available for this pitch yet.</div>
+            ) : (
+              <ol className="founder-review-timeline">
+                {reviewHistory.map((event) => (
+                  <li key={event.reviewEventId}>
+                    <div className="founder-review-timeline-top">
+                      <strong className={event.decision === 'REJECT' ? 'rejected' : 'published'}>{event.decision === 'REJECT' ? 'Rejected' : 'Published'}</strong>
+                      <time dateTime={event.decidedAt}>{new Date(event.decidedAt).toLocaleString()}</time>
+                    </div>
+                    <span className="founder-review-timeline-reviewer">Reviewed by {event.reviewerName}</span>
+                    {event.reviewNote ? <p>{event.reviewNote}</p> : <p className="founder-review-no-note">No additional note was provided.</p>}
+                  </li>
+                ))}
+              </ol>
+            )}
+            <div className="founder-review-modal-actions">
+              {reviewHistoryPitch.pitchStatus === 'REJECTED' && (
+                <button type="button" className="founder-primary-create-btn" onClick={() => { const pitch = reviewHistoryPitch; closeReviewHistory(); openEditModal(pitch); }}>Edit and Resubmit</button>
+              )}
+              <button type="button" className="founder-secondary-action-btn" onClick={closeReviewHistory}>Close</button>
+            </div>
+          </section>
         </div>
       )}
 
