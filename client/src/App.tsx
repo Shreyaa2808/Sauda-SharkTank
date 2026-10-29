@@ -21,6 +21,10 @@ import { ComparisonMatrix } from './components/compare/ComparisonMatrix.tsx';
 import { DiscoveryHero } from './components/home/DiscoveryHero.tsx';
 import { ViewerDashboard } from './components/dashboard/ViewerDashboard.tsx';
 import { AdminReviewPage } from './components/admin/AdminReviewPage.tsx';
+import { AdminLayout, type AdminNavSection } from './components/admin/AdminLayout.tsx';
+import { AdminOverview } from './components/admin/AdminOverview.tsx';
+import { AdminHistoricalManager } from './components/admin/AdminHistoricalManager.tsx';
+import { AdminCsvImports } from './components/admin/AdminCsvImports.tsx';
 import { NotFoundPage } from './components/notfound/NotFoundPage.tsx';
 import { computeRegistryMetrics } from './utils/registryMetrics.ts';
 import { fetchStartups } from './services/api.ts';
@@ -34,7 +38,21 @@ import {
 } from './utils/formatters.ts';
 
 type FilterType = 'ALL' | PitchType;
-type KnownRoute = 'discovery' | 'login' | 'dashboard' | 'profile' | 'settings' | 'founder' | 'investor' | 'connections' | 'admin';
+type KnownRoute =
+  | 'discovery'
+  | 'login'
+  | 'dashboard'
+  | 'profile'
+  | 'settings'
+  | 'founder'
+  | 'investor'
+  | 'connections'
+  | 'admin'
+  | 'admin-overview'
+  | 'admin-reviews'
+  | 'admin-historical'
+  | 'admin-imports';
+
 // 'notfound' is a real view for unrecognised URLs; it has no path of its own (the address bar keeps the requested URL).
 type AppRoute = KnownRoute | 'notfound';
 
@@ -52,11 +70,28 @@ const ROUTE_PATHS: Record<KnownRoute, string> = {
   founder: '/founder',
   investor: '/investor',
   connections: '/connections',
-  admin: '/admin/reviews',
+  admin: '/admin',
+  'admin-overview': '/admin/overview',
+  'admin-reviews': '/admin/reviews',
+  'admin-historical': '/admin/historical',
+  'admin-imports': '/admin/imports',
 };
 
 // Routes that need a server-verified session. Role checks for workspaces are layered on top.
-const AUTH_REQUIRED_ROUTES: AppRoute[] = ['dashboard', 'profile', 'settings', 'founder', 'investor', 'connections', 'admin'];
+const AUTH_REQUIRED_ROUTES: AppRoute[] = [
+  'dashboard',
+  'profile',
+  'settings',
+  'founder',
+  'investor',
+  'connections',
+  'admin',
+  'admin-overview',
+  'admin-reviews',
+  'admin-historical',
+  'admin-imports',
+];
+
 const ROUTE_LABELS: Record<AppRoute, string> = {
   notfound: 'Page Not Found',
   discovery: 'Startup Discovery',
@@ -67,9 +102,32 @@ const ROUTE_LABELS: Record<AppRoute, string> = {
   founder: 'Founder Workspace',
   investor: 'Investor Deal Room',
   connections: 'Connections',
-  admin: 'Admin Review Queue',
+  admin: 'Admin Console',
+  'admin-overview': 'Admin Overview',
+  'admin-reviews': 'Pitch Review Queue',
+  'admin-historical': 'Historical Data Management',
+  'admin-imports': 'CSV Imports & Reports',
 };
-const WORKSPACE_ROUTES: AppRoute[] = ['dashboard', 'founder', 'investor', 'connections', 'admin'];
+
+const WORKSPACE_ROUTES: AppRoute[] = [
+  'dashboard',
+  'founder',
+  'investor',
+  'connections',
+  'admin',
+  'admin-overview',
+  'admin-reviews',
+  'admin-historical',
+  'admin-imports',
+];
+
+const ADMIN_ROUTES: AppRoute[] = [
+  'admin',
+  'admin-overview',
+  'admin-reviews',
+  'admin-historical',
+  'admin-imports',
+];
 
 const pathToRoute = (rawPath: string): AppRoute => {
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
@@ -203,7 +261,9 @@ export const App: React.FC = () => {
       ? 'login'
       : currentUser && requestedRoute === 'login'
         ? 'discovery'
-        : null;
+        : requestedRoute === 'admin'
+          ? 'admin-overview'
+          : null;
   const currentRoute: AppRoute = guardRedirect ?? requestedRoute;
 
   // Keep the address bar in step with a guard redirect (history only; no state updates here).
@@ -430,6 +490,76 @@ export const App: React.FC = () => {
     );
   }
 
+  // Dedicated Administrative Application Shell
+  if (ADMIN_ROUTES.includes(currentRoute)) {
+    const adminSection: AdminNavSection =
+      currentRoute === 'admin-reviews'
+        ? 'reviews'
+        : currentRoute === 'admin-historical'
+          ? 'historical'
+          : currentRoute === 'admin-imports'
+            ? 'imports'
+            : 'overview';
+
+    return (
+      <>
+        {introActive && (
+          <CinematicIntro onComplete={handleIntroComplete} />
+        )}
+        {showBootstrapLoader && (
+          <SaudaLoader message="Entering Sauda Admin" />
+        )}
+        <AdminLayout
+          activeSection={adminSection}
+          currentUser={currentUser}
+          authorized={Boolean(currentUser && hasRole('ADMIN'))}
+          onNavigate={(sec) => {
+            const target: KnownRoute =
+              sec === 'reviews'
+                ? 'admin-reviews'
+                : sec === 'historical'
+                  ? 'admin-historical'
+                  : sec === 'imports'
+                    ? 'admin-imports'
+                    : 'admin-overview';
+            navigateTo(target);
+          }}
+          onExitToPublic={() => navigateTo('dashboard')}
+          onLogout={handleLogout}
+        >
+          {adminSection === 'overview' && (
+            <AdminOverview
+              onNavigate={(sec) => {
+                const target: KnownRoute =
+                  sec === 'reviews'
+                    ? 'admin-reviews'
+                    : sec === 'historical'
+                      ? 'admin-historical'
+                      : 'admin-imports';
+                navigateTo(target);
+              }}
+            />
+          )}
+
+          {adminSection === 'reviews' && (
+            <AdminReviewPage
+              authorized={Boolean(currentUser && hasRole('ADMIN'))}
+              onReturnToDashboard={() => navigateTo('admin-overview')}
+            />
+          )}
+
+          {adminSection === 'historical' && (
+            <AdminHistoricalManager />
+          )}
+
+          {adminSection === 'imports' && (
+            <AdminCsvImports />
+          )}
+        </AdminLayout>
+      </>
+    );
+  }
+
   return (
     <main className="app-shell">
       {/* 0. CINEMATIC SHARK VIDEO INTRO OVERLAY */}
@@ -638,13 +768,6 @@ export const App: React.FC = () => {
         ) : (
           <WorkspaceGate {...gateProps} kind="connections" />
         )
-      )}
-
-      {isInitialAuthDone && currentRoute === 'admin' && (
-        <AdminReviewPage
-          authorized={Boolean(currentUser && hasRole('ADMIN'))}
-          onReturnToDashboard={() => navigateTo('dashboard')}
-        />
       )}
 
       {/* NOT FOUND: unrecognised URLs never fall through to discovery */}

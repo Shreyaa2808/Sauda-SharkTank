@@ -37,7 +37,7 @@ const ROUTE_PATHS: Record<DrawerRoute, string> = {
   connections: '/connections',
   profile: '/profile',
   settings: '/settings',
-  admin: '/admin/reviews',
+  admin: '/admin/overview',
 };
 
 /* Clean inline SVG icons (no icon dependency). */
@@ -216,7 +216,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
               {currentUser && hasFounder && renderLink('founder', 'Founder Workspace', 'founder')}
               {currentUser && hasInvestor && renderLink('investor', 'Investor Deal Room', 'investor')}
               {currentUser && (hasFounder || hasInvestor) && renderLink('connections', 'Connections', 'connections')}
-              {currentUser && hasAdmin && renderLink('admin', 'Admin Review Queue', 'admin', 'Review submitted pitches')}
+              {currentUser && hasAdmin && renderLink('admin', 'Admin Console', 'admin', 'Moderation, historical registry & imports')}
             </ul>
           </nav>
 
