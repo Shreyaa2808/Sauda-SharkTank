@@ -5,9 +5,19 @@ interface CinematicIntroProps {
   onComplete: () => void;
 }
 
-type ScenePhase = 'shark' | 'enter';
+type ScenePhase = 'video' | 'enter';
 
 export const INTRO_SESSION_STORAGE_KEY = 'sauda_intro_has_started';
+
+// Pitch-arena clip is 10s at 24fps. Played at 1.25x so the whole intro lasts ~8s, matching the theme audio.
+const INTRO_VIDEO_SRC = '/media/sauda-pitch-intro.mp4';
+const PLAYBACK_RATE = 1.25;
+// Media-time (seconds) at which the animated SAUDA. wordmark begins, shortly before the clip ends.
+const TITLE_REVEAL_AT = 6.6;
+// Background theme audio. Starts automatically when the browser allows it, otherwise on the first click/key press.
+const MUSIC_SRC = '/media/sauda-intro-theme.mp3';
+const MUSIC_VOLUME = 1.0;
+const WORDMARK_LETTERS = ['S', 'A', 'U', 'D', 'A'];
 
 export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) => {
   const prefersReducedMotion =
@@ -15,7 +25,7 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const [phase, setPhase] = useState<ScenePhase>(() =>
-    prefersReducedMotion ? 'enter' : 'shark',
+    prefersReducedMotion ? 'enter' : 'video',
   );
   const [videoLoaded, setVideoLoaded] = useState<boolean>(false);
   const [videoError, setVideoError] = useState<boolean>(false);
@@ -25,7 +35,10 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
   const [isExiting, setIsExiting] = useState<boolean>(false);
   const [exitMode, setExitMode] = useState<'enter' | 'skip'>('enter');
 
+  const [muted, setMuted] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const musicRef = useRef<HTMLAudioElement>(null);
+  const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const enterBtnRef = useRef<HTMLButtonElement>(null);
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCompleteRef = useRef(onComplete);
@@ -43,6 +56,84 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
     }
   }, []);
 
+  // Lock page scroll behind the intro and drop the reserved scrollbar gutter
+  // (index.css sets `scrollbar-gutter: stable`, which left a strip on the right edge)
+  useEffect(() => {
+    const html = document.documentElement;
+    const prev = {
+      body: document.body.style.overflow,
+      html: html.style.overflow,
+      gutter: html.style.scrollbarGutter,
+    };
+    document.body.style.overflow = 'hidden';
+    html.style.overflow = 'hidden';
+    html.style.scrollbarGutter = 'auto';
+    return () => {
+      document.body.style.overflow = prev.body;
+      html.style.overflow = prev.html;
+      html.style.scrollbarGutter = prev.gutter;
+    };
+  }, []);
+
+  // Fade the theme out (used on Enter / Skip / unmount)
+  const stopMusic = useCallback(() => {
+    const a = musicRef.current;
+    if (!a || a.paused) return;
+    if (fadeRef.current) clearInterval(fadeRef.current);
+    fadeRef.current = setInterval(() => {
+      if (a.volume > 0.06) {
+        a.volume = Math.max(0, a.volume - 0.06);
+      } else {
+        a.pause();
+        if (fadeRef.current) clearInterval(fadeRef.current);
+      }
+    }, 40);
+  }, []);
+
+  // Try to autoplay; browsers often block sound until the viewer interacts, so retry on first interaction
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    const a = musicRef.current;
+    if (!a) return;
+    a.volume = MUSIC_VOLUME;
+    let started = false;
+
+    const tryPlay = () => {
+      if (started || isExitingRef.current) return;
+      a.play()
+        .then(() => {
+          started = true;
+          cleanup();
+        })
+        .catch(() => {});
+    };
+    const cleanup = () => {
+      window.removeEventListener('pointerdown', tryPlay);
+      window.removeEventListener('keydown', tryPlay);
+      window.removeEventListener('touchstart', tryPlay);
+    };
+
+    tryPlay();
+    window.addEventListener('pointerdown', tryPlay);
+    window.addEventListener('keydown', tryPlay);
+    window.addEventListener('touchstart', tryPlay);
+    return () => {
+      cleanup();
+      if (fadeRef.current) clearInterval(fadeRef.current);
+      a.pause();
+    };
+  }, [prefersReducedMotion]);
+
+  const toggleMute = useCallback(() => {
+    const a = musicRef.current;
+    const next = !muted;
+    setMuted(next);
+    if (a) {
+      a.muted = next;
+      if (!next && a.paused && a.currentTime === 0) a.play().catch(() => {});
+    }
+  }, [muted]);
+
   // Clean up exit timeout only on unmount
   useEffect(() => {
     return () => {
@@ -56,6 +147,7 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
     try {
       sessionStorage.setItem(INTRO_SESSION_STORAGE_KEY, 'true');
     } catch {}
+    stopMusic();
     isExitingRef.current = true;
     setIsExiting(true);
     setExitMode('enter');
@@ -68,7 +160,7 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
     exitTimeoutRef.current = setTimeout(() => {
       onCompleteRef.current();
     }, 520);
-  }, [prefersReducedMotion]);
+  }, [prefersReducedMotion, stopMusic]);
 
   // Immediate skip transition
   const handleSkip = useCallback(() => {
@@ -76,6 +168,7 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
     try {
       sessionStorage.setItem(INTRO_SESSION_STORAGE_KEY, 'true');
     } catch {}
+    stopMusic();
     isExitingRef.current = true;
     setIsExiting(true);
     setExitMode('skip');
@@ -88,7 +181,7 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
     exitTimeoutRef.current = setTimeout(() => {
       onCompleteRef.current();
     }, 180);
-  }, [prefersReducedMotion]);
+  }, [prefersReducedMotion, stopMusic]);
 
   // Global keyboard shortcuts (Escape = skip immediately, Enter = enter Sauda)
   useEffect(() => {
@@ -122,21 +215,20 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
   }, [videoLoaded, prefersReducedMotion]);
 
   // Video time-update driven progression
-  // Shark sequence runs 0.0s - 11.5s; cross-dissolve to investor room completes by ~11.8s.
-  // We trigger the title reveal at 11.8s so typography emerges precisely over the investor room.
+  // The wordmark reveal starts just before the clip finishes so SAUDA. emerges over the arena.
   const handleTimeUpdate = () => {
     const video = videoRef.current;
     if (!video) return;
 
     const current = video.currentTime;
-    const duration = video.duration || 16;
+    const duration = video.duration || 10;
     const pct = Math.min(100, Math.round((current / duration) * 100));
     setProgress(pct);
 
-    if (current >= 11.8) {
+    if (current >= TITLE_REVEAL_AT) {
       if (phase !== 'enter') setPhase('enter');
     } else {
-      if (phase !== 'shark') setPhase('shark');
+      if (phase !== 'video') setPhase('video');
     }
   };
 
@@ -153,6 +245,8 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
     if (video) {
       video.muted = true;
       video.playsInline = true;
+      video.defaultPlaybackRate = PLAYBACK_RATE;
+      video.playbackRate = PLAYBACK_RATE;
       video
         .play()
         .then(() => {
@@ -186,6 +280,22 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
       {/* 1. Fine Gold Progress Sweep at Top Edge */}
       <div className="intro-progress-bar" style={{ width: `${progress}%` }} />
 
+      {/* 1b. Background theme audio + mute toggle */}
+      <audio ref={musicRef} src={MUSIC_SRC} preload="auto" />
+      <div className="intro-sound-wrapper">
+        <button
+          type="button"
+          className={`skip-intro-btn sound-btn ${muted ? '' : 'on'}`}
+          onClick={toggleMute}
+          disabled={isExiting}
+          aria-pressed={!muted}
+          aria-label={muted ? 'Unmute intro music' : 'Mute intro music'}
+        >
+          <span aria-hidden="true">{muted ? '🔇' : '🔊'}</span>
+          <span>{muted ? 'Sound off' : 'Sound on'}</span>
+        </button>
+      </div>
+
       {/* 2. Floating Bottom-Right Skip Intro Control */}
       <div className="intro-skip-wrapper">
         <button
@@ -206,33 +316,29 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
         <video
           ref={videoRef}
           className={`intro-video-element ${videoLoaded && !videoError ? 'visible' : 'hidden'}`}
-          src="/media/sauda-shark-intro.mp4"
+          src={INTRO_VIDEO_SRC}
           muted
           playsInline
           autoPlay
           preload="auto"
           onTimeUpdate={handleTimeUpdate}
           onEnded={handleVideoEnded}
+          onLoadedMetadata={() => {
+            if (videoRef.current) videoRef.current.playbackRate = PLAYBACK_RATE;
+          }}
           onCanPlay={() => {
             setVideoLoaded(true);
             setVideoError(false);
           }}
           onError={() => {
-            // Fallback to source if trimmed intro is not available
-            const v = videoRef.current;
-            if (v && v.src.endsWith('sauda-shark-intro.mp4')) {
-              v.src = '/media/sauda-shark-source.mp4';
-              v.play().catch(() => {
-                setVideoError(true);
-                setPhase('enter');
-              });
-            } else {
-              setVideoError(true);
-              setPhase('enter');
-            }
+            setVideoError(true);
+            setPhase('enter');
           }}
         />
       )}
+
+      {/* 3b. Fade-from-black opening */}
+      {!prefersReducedMotion && <div className="intro-fade-from-black" aria-hidden="true" />}
 
       {/* 4. Subtle Radial Scrim: Dims investor chairs to ensure typography contrast */}
       <div
@@ -267,8 +373,20 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
           </div>
 
           {/* Order 2: SAUDA Wordmark */}
-          <h1 className="intro-wordmark">
-            SAUDA<span className="wordmark-dot">.</span>
+          <h1 className="intro-wordmark" aria-label="Sauda.">
+            <span className="wordmark-letters" aria-hidden="true">
+              {WORDMARK_LETTERS.map((ch, i) => (
+                <span
+                  key={i}
+                  className="wordmark-letter"
+                  style={{ ['--i' as string]: i } as React.CSSProperties}
+                >
+                  {ch}
+                </span>
+              ))}
+              <span className="wordmark-dot">.</span>
+            </span>
+            <span className="wordmark-rule" aria-hidden="true" />
           </h1>
 
           {/* Order 3: THE STARTUP EXCHANGE Subtitle */}

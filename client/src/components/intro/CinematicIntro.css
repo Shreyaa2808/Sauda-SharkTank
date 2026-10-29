@@ -6,10 +6,9 @@
 .cinematic-intro-stage {
   position: fixed;
   inset: 0;
-  width: 100vw;
+  width: 100%;
   height: 100svh;
   height: 100dvh;
-  height: 100vh;
   z-index: 9999;
   background: #02070D;
   color: #FFFFFF;
@@ -116,8 +115,7 @@
   height: 100%;
   object-fit: cover;
   object-position: center;
-  transform: scale(1.29);
-  transform-origin: center center;
+  transform: none;
   z-index: 1;
   opacity: 0;
   transition: opacity 600ms ease;
@@ -125,6 +123,98 @@
 
 .intro-video-element.visible {
   opacity: 1;
+}
+
+@keyframes intro-slow-push {
+  from { transform: scale(1.04); }
+  to { transform: scale(1.14); }
+}
+
+/* 4b. Cinematic opening layers */
+.intro-fade-from-black {
+  position: absolute;
+  inset: 0;
+  background: #02070D;
+  z-index: 5;
+  pointer-events: none;
+  animation: intro-from-black 1600ms ease-out 100ms forwards;
+}
+@keyframes intro-from-black {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
+}
+
+.intro-letterbox {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9vh;
+  background: #02070D;
+  z-index: 6;
+  pointer-events: none;
+  animation: letterbox-in 1400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.intro-letterbox.top { top: 0; }
+.intro-letterbox.bottom { bottom: 0; }
+@keyframes letterbox-in {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.intro-letterbox.top { transform-origin: top; }
+.intro-letterbox.bottom { transform-origin: bottom; }
+
+.intro-opening-caption {
+  position: absolute;
+  left: clamp(20px, 5vw, 64px);
+  bottom: calc(9vh + 28px);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  opacity: 0;
+  animation: caption-in 900ms cubic-bezier(0.16, 1, 0.3, 1) 1300ms forwards;
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+.intro-opening-caption.gone {
+  opacity: 0 !important;
+  animation: none;
+  transform: translateY(-6px);
+}
+@keyframes caption-in {
+  from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+.opening-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 2.4px;
+  color: var(--gold-accent, #C3A064);
+}
+.opening-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #C3A064;
+  box-shadow: 0 0 0 0 rgba(195, 160, 100, 0.6);
+  animation: opening-pulse 1.6s ease-out infinite;
+}
+@keyframes opening-pulse {
+  to { box-shadow: 0 0 0 10px rgba(195, 160, 100, 0); }
+}
+.opening-line {
+  font-family: var(--font-editorial, 'Newsreader', 'Fraunces', Georgia, serif);
+  font-size: clamp(18px, 2.4vw, 30px);
+  font-weight: 600;
+  font-style: italic;
+  color: #F8FAFC;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.9);
+  max-width: 560px;
+  line-height: 1.25;
 }
 
 /* 5. Subtle Radial Scrim: Subtly dims investor chairs so typography has crisp contrast */
@@ -202,15 +292,15 @@
 }
 
 .intro-reveal-centerpiece.revealed .intro-subtitle {
-  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 240ms forwards;
+  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 1100ms forwards;
 }
 
 .intro-reveal-centerpiece.revealed .intro-tagline {
-  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 360ms forwards;
+  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 1300ms forwards;
 }
 
 .intro-reveal-centerpiece.revealed .enter-platform-btn-container {
-  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 480ms forwards;
+  animation: title-dissolve-in 600ms cubic-bezier(0.16, 1, 0.3, 1) 1600ms forwards;
   pointer-events: auto;
 }
 
@@ -291,9 +381,63 @@
   text-shadow: 0 8px 30px rgba(0, 0, 0, 0.85);
 }
 
-.wordmark-dot {
-  color: var(--gold-accent, #C3A064);
+.wordmark-letters {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
 }
+
+.wordmark-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.45em) scale(0.96);
+  filter: blur(14px);
+}
+
+.wordmark-dot {
+  display: inline-block;
+  color: var(--gold-accent, #C3A064);
+  opacity: 0;
+  transform: scale(0);
+  transform-origin: 50% 85%;
+  text-shadow: 0 0 24px rgba(195, 160, 100, 0.8);
+}
+
+.wordmark-rule {
+  display: block;
+  height: 2px;
+  width: 0;
+  margin: 14px auto 0;
+  background: linear-gradient(90deg, transparent, #C3A064, #E0C797, #C3A064, transparent);
+  box-shadow: 0 0 14px rgba(195, 160, 100, 0.6);
+}
+
+/* Animated SAUDA. reveal: letters rise out of blur one by one, the gold dot pops, rule draws and a shine sweeps across */
+.intro-reveal-centerpiece.revealed .wordmark-letter {
+  animation: letter-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) calc(120ms + var(--i) * 110ms) forwards;
+}
+.intro-reveal-centerpiece.revealed .wordmark-dot {
+  animation: dot-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) 780ms forwards,
+    dot-glow 2.4s ease-in-out 1.6s infinite;
+}
+.intro-reveal-centerpiece.revealed .wordmark-rule {
+  animation: rule-draw 1100ms cubic-bezier(0.16, 1, 0.3, 1) 900ms forwards;
+}
+
+@keyframes letter-rise {
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes dot-pop {
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes dot-glow {
+  0%, 100% { text-shadow: 0 0 14px rgba(195, 160, 100, 0.5); }
+  50% { text-shadow: 0 0 34px rgba(195, 160, 100, 1); }
+}
+@keyframes rule-draw {
+  to { width: min(70%, 420px); }
+}
+
 
 /* Order 3: THE STARTUP EXCHANGE Subtitle */
 .intro-subtitle {
@@ -406,7 +550,12 @@
   .intro-reveal-centerpiece .intro-subtitle,
   .intro-reveal-centerpiece .intro-tagline,
   .intro-reveal-centerpiece .enter-platform-btn-container,
-  .brand-dot-gold {
+  .brand-dot-gold,
+  .intro-video-element,
+  .wordmark-letters,
+  .wordmark-letter,
+  .wordmark-dot,
+  .wordmark-rule {
     animation: none !important;
     transition: none !important;
   }
@@ -426,7 +575,19 @@
 /* ==========================================================================
    MOBILE RESPONSIVENESS (< 640px)
    ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .wordmark-letter,
+  .wordmark-dot {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .wordmark-rule { width: min(70%, 420px) !important; }
+}
+
 @media (max-width: 640px) {
+  .intro-letterbox { height: 6vh; }
+  .intro-opening-caption { bottom: calc(6vh + 70px); }
   .intro-skip-wrapper {
     bottom: max(16px, env(safe-area-inset-bottom));
     right: max(16px, env(safe-area-inset-right));
@@ -453,4 +614,17 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+
+/* Voice-over toggle (bottom-left) */
+.intro-sound-wrapper {
+  position: absolute;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: max(24px, env(safe-area-inset-left));
+  z-index: 30;
+}
+.sound-btn.on { border-color: #C3A064; box-shadow: 0 0 18px rgba(195, 160, 100, 0.35); }
+@media (max-width: 640px) {
+  .intro-sound-wrapper { bottom: max(16px, env(safe-area-inset-bottom)); left: max(16px, env(safe-area-inset-left)); }
 }
