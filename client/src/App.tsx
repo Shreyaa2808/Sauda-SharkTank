@@ -19,7 +19,7 @@ import { ConnectionsHub } from './components/connections/ConnectionsHub.tsx';
 import { StartupDetailModal } from './components/startup/StartupDetailModal.tsx';
 import { ComparisonTray } from './components/compare/ComparisonTray.tsx';
 import { ComparisonMatrix } from './components/compare/ComparisonMatrix.tsx';
-import { DiscoveryHero } from './components/home/DiscoveryHero.tsx';
+import { DiscoveryHero, HomeStory, ScrollProgress } from './components/home/DiscoveryHero.tsx';
 import { ViewerDashboard } from './components/dashboard/ViewerDashboard.tsx';
 import { AdminReviewPage } from './components/admin/AdminReviewPage.tsx';
 import { AdminLayout, type AdminNavSection } from './components/admin/AdminLayout.tsx';
@@ -1033,6 +1033,7 @@ export const App: React.FC = () => {
       {currentRoute === 'discovery' && (
         <>
           {/* 2. MODERN FINANCE HERO & PLATFORM TELEMETRY */}
+          <ScrollProgress />
           <DiscoveryHero
             loading={loading}
             hasError={Boolean(error)}
@@ -1047,6 +1048,8 @@ export const App: React.FC = () => {
               scrollToExplorer();
             }}
           />
+
+          <HomeStory startups={startups} onExplore={scrollToExplorer} />
 
       {/* 3. STARTUP EXPLORER SECTION */}
       <section className="explorer" id="explorer">

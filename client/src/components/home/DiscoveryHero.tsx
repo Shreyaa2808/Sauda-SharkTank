@@ -43,6 +43,108 @@ function useMediaQuery(query: string): boolean {
   );
 }
 
+/** Adds `is-in` to elements marked data-reveal once they scroll into view. */
+export function useScrollReveal(rootRef: React.RefObject<HTMLElement | null>) {
+  React.useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const els = Array.from(root.querySelectorAll<HTMLElement>('[data-reveal]'));
+    if (typeof IntersectionObserver === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      els.forEach((el) => el.classList.add('is-in'));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-in');
+            io.unobserve(e.target);
+          }
+        });
+      },
+      { threshold: 0.18, rootMargin: '0px 0px -8% 0px' },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [rootRef]);
+}
+
+/** Thin gold bar showing page scroll progress. */
+export const ScrollProgress: React.FC = () => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+      if (ref.current) ref.current.style.transform = `scaleX(${p})`;
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+  return <div className="scroll-progress" aria-hidden="true"><div ref={ref} /></div>;
+};
+
+const STORY_STEPS = [
+  { n: '01', title: 'Discover', body: 'Browse televised Shark Tank pitches and platform listings, always labelled so you know the source.' },
+  { n: '02', title: 'Evaluate', body: 'Open any venture to see the ask, equity, sector and stage side by side with its peers.' },
+  { n: '03', title: 'Connect', body: 'Save the ones that stand out and reach founders directly from your workspace.' },
+];
+
+/** Scroll-driven story band between the hero and the venture registry. */
+export const HomeStory: React.FC<{ startups: Startup[]; onExplore: () => void }> = ({ startups, onExplore }) => {
+  const ref = React.useRef<HTMLElement>(null);
+  useScrollReveal(ref);
+  const names = React.useMemo(() => startups.map((s) => s.brandName).filter(Boolean).slice(0, 14), [startups]);
+  const loop = names.length ? [...names, ...names] : [];
+
+  return (
+    <section className="home-story" ref={ref} aria-labelledby="home-story-title">
+      {loop.length > 0 && (
+        <div className="home-marquee" aria-hidden="true">
+          <div className="home-marquee-track">
+            {loop.map((n, i) => (
+              <span key={`${n}-${i}`}>{n}<i /></span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="home-story-inner">
+        <div className="home-story-head" data-reveal>
+          <p className="home-hero-eyebrow">How Sauda works</p>
+          <h2 id="home-story-title">From first look to <span>real conversation.</span></h2>
+        </div>
+
+        <ol className="home-story-steps">
+          {STORY_STEPS.map((st, i) => (
+            <li key={st.n} className="home-story-step" data-reveal style={{ ['--d' as string]: `${i * 120}ms` }}>
+              <span className="home-story-num">{st.n}</span>
+              <h3>{st.title}</h3>
+              <p>{st.body}</p>
+            </li>
+          ))}
+        </ol>
+
+        <div className="home-story-cta" data-reveal>
+          <button type="button" className="home-btn home-btn-primary" onClick={onExplore}>
+            <span>Start exploring</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 /** Rotating spotlight over real registry records: one venture leaves, the next arrives. */
 const FeaturedSpotlight: React.FC<{
   startups: Startup[];
@@ -242,6 +344,25 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
     { scope: heroRef, dependencies: [reducedMotion, compactScreen], revertOnUpdate: true },
   );
 
+  React.useEffect(() => {
+    if (reducedMotion) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const el = heroRef.current;
+      if (!el) return;
+      const p = Math.min(1, Math.max(0, window.scrollY / Math.max(1, el.offsetHeight)));
+      el.style.setProperty('--p', p.toFixed(4));
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [reducedMotion]);
+
   return (
     <section ref={heroRef} className="home-hero" id="hero" aria-labelledby="home-hero-title">
       <div className="home-hero-stage" aria-hidden="true">
@@ -269,8 +390,8 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
         <div className="home-hero-copy">
           <p className="home-hero-eyebrow">The Sauda pitch floor</p>
           <h1 id="home-hero-title" className="home-hero-title">
-            Ideas enter.
-            <span>Empires begin.</span>
+            <b className="home-title-line">Ideas enter.</b>
+            <span className="home-title-line">Empires begin.</span>
           </h1>
           <p className="home-hero-lede">
             Discover standout ventures, explore founder pitches, and find opportunities worth a closer look.
@@ -299,6 +420,11 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
           />
         </div>
       </div>
+
+      <a className="home-scroll-cue" href="#explorer" onClick={(e) => { e.preventDefault(); onExplore(); }} aria-label="Scroll to the venture registry">
+        <span>Scroll</span>
+        <i aria-hidden="true" />
+      </a>
 
       <div className="home-kpi-wrap">
         <dl className="home-kpi-band" aria-label="Registry summary">
