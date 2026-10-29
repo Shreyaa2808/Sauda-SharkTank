@@ -1,8 +1,13 @@
 import React from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
 import type { Startup } from '../../types/startup.ts';
 import type { RegistryMetrics } from '../../utils/registryMetrics.ts';
 import { formatCurrencyCompact, formatEquity } from '../../utils/formatters.ts';
 import './DiscoveryHero.css';
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 interface DiscoveryHeroProps {
   loading: boolean;
@@ -207,9 +212,38 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
   const compactScreen = useMediaQuery('(max-width: 768px)');
   const [videoFailed, setVideoFailed] = React.useState(false);
   const showVideo = !reducedMotion && !compactScreen && !videoFailed;
+  const heroRef = React.useRef<HTMLElement | null>(null);
+
+  useGSAP(
+    () => {
+      // Keep the lighting static for reduced-motion users and compact screens.
+      if (reducedMotion || compactScreen) return;
+
+      const spotlight = heroRef.current?.querySelector<HTMLElement>('.home-hero-spotlight');
+      if (!spotlight || !heroRef.current) return;
+
+      gsap.fromTo(
+        spotlight,
+        { xPercent: 0, opacity: 0.82 },
+        {
+          xPercent: 350,
+          opacity: 0.06,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: heroRef.current,
+            start: 'top top',
+            end: 'bottom top',
+            scrub: 1,
+            invalidateOnRefresh: true,
+          },
+        },
+      );
+    },
+    { scope: heroRef, dependencies: [reducedMotion, compactScreen], revertOnUpdate: true },
+  );
 
   return (
-    <section className="home-hero" id="hero" aria-labelledby="home-hero-title">
+    <section ref={heroRef} className="home-hero" id="hero" aria-labelledby="home-hero-title">
       <div className="home-hero-stage" aria-hidden="true">
         {showVideo && (
           <video
@@ -227,6 +261,7 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
         )}
         <div className="home-hero-poster" style={{ backgroundImage: `url(${VIDEO_POSTER})` }} />
         <div className="home-hero-shade" />
+        <div className="home-hero-spotlight" />
         <div className="home-hero-lights" />
       </div>
 
