@@ -1,0 +1,226 @@
+/* Battle History Styling */
+.battle-history-view {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 30px 24px 60px 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 216, 246, 0.15);
+  padding-bottom: 18px;
+}
+
+.history-eyebrow {
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+  color: #00d8f6;
+  text-transform: uppercase;
+}
+
+.history-heading {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 4px 0 0 0;
+}
+
+.new-battle-btn {
+  background: linear-gradient(135deg, #00d8f6 0%, #0284c7 100%);
+  border: 1px solid #38bdf8;
+  color: #030c1a;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(0, 216, 246, 0.35);
+}
+
+/* Empty State */
+.history-empty-state {
+  background: rgba(4, 15, 30, 0.6);
+  border: 1px dashed rgba(0, 216, 246, 0.3);
+  border-radius: 14px;
+  padding: 60px 30px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.empty-radar-icon {
+  font-size: 3rem;
+  color: #00d8f6;
+  opacity: 0.8;
+}
+
+.history-empty-state h3 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+}
+
+.history-empty-state p {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  max-width: 480px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.launch-first-btn {
+  margin-top: 10px;
+  background: #00d8f6;
+  border: none;
+  color: #020814;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 10px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Cards Grid */
+.history-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 18px;
+}
+
+.history-card {
+  background: rgba(5, 16, 32, 0.7);
+  border: 1px solid rgba(0, 216, 246, 0.18);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.25s ease;
+}
+
+.history-card:hover {
+  transform: translateY(-3px);
+  border-color: #00d8f6;
+  box-shadow: 0 10px 30px rgba(0, 216, 246, 0.15);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-date {
+  font-size: 0.65rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.outcome-badge {
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.outcome-investor_a,
+.outcome-investor_b {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.outcome-tie {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.outcome-neither {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.startup-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+}
+
+.sector-subtitle {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.mini-h2h-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.h2h-side {
+  display: flex;
+  flex-direction: column;
+}
+
+.h2h-name {
+  font-size: 0.65rem;
+  color: #cbd5e1;
+  font-weight: 600;
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h2h-score {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #00d8f6;
+}
+
+.h2h-vs {
+  font-size: 0.6rem;
+  font-weight: 900;
+  color: #64748b;
+}
+
+.card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+}
+
+.readiness-tag {
+  font-size: 0.65rem;
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.view-link {
+  font-size: 0.65rem;
+  color: #00d8f6;
+  font-weight: 700;
+}

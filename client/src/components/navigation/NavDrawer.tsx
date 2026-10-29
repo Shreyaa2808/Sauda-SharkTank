@@ -7,6 +7,7 @@ export type DrawerRoute =
   | 'archive'
   | 'dashboard'
   | 'founder'
+  | 'founder-arena'
   | 'investor'
   | 'connections'
   | 'profile'
@@ -35,6 +36,7 @@ const ROUTE_PATHS: Record<DrawerRoute, string> = {
   archive: '/archive',
   dashboard: '/dashboard',
   founder: '/founder',
+  'founder-arena': '/founder/arena',
   investor: '/investor',
   connections: '/connections',
   profile: '/profile',
@@ -43,7 +45,7 @@ const ROUTE_PATHS: Record<DrawerRoute, string> = {
 };
 
 /* Clean inline SVG icons (no icon dependency). */
-const Icon: React.FC<{ name: 'discover' | 'archive' | 'dashboard' | 'founder' | 'investor' | 'connections' | 'profile' | 'settings' | 'admin' | 'workspaces' | 'signin' | 'signout' | 'close' }> = ({ name }) => {
+const Icon: React.FC<{ name: 'discover' | 'archive' | 'dashboard' | 'founder' | 'arena' | 'investor' | 'connections' | 'profile' | 'settings' | 'admin' | 'workspaces' | 'signin' | 'signout' | 'close' }> = ({ name }) => {
   const common = { width: 18, height: 18, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
   switch (name) {
     case 'discover':
@@ -54,6 +56,8 @@ const Icon: React.FC<{ name: 'discover' | 'archive' | 'dashboard' | 'founder' | 
       return (<svg {...common}><rect x="3" y="3" width="5.5" height="5.5" rx="1" /><rect x="11.5" y="3" width="5.5" height="5.5" rx="1" /><rect x="3" y="11.5" width="5.5" height="5.5" rx="1" /><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1" /></svg>);
     case 'founder':
       return (<svg {...common}><path d="M3 17h14" /><path d="M5 17V9l5-5 5 5v8" /><path d="M8.5 17v-4h3v4" /></svg>);
+    case 'arena':
+      return (<svg {...common}><path d="M4 16l4-4 4 4 4-4" /><circle cx="10" cy="7" r="3" /><path d="M2 18h16" /></svg>);
     case 'investor':
       return (<svg {...common}><path d="M3 16.5h14" /><path d="M4.5 13l3.5-4 3 2.5 4.5-6" /><path d="M12.5 5.5H16V9" /></svg>);
     case 'connections':
@@ -237,6 +241,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
                 </li>
               )}
               {currentUser && hasFounder && renderLink('founder', 'Founder Workspace', 'founder')}
+              {currentUser && hasFounder && renderLink('founder-arena', 'Founder Battle Arena', 'arena', 'Cinematic Investor Matching')}
               {currentUser && hasInvestor && renderLink('investor', 'Investor Deal Room', 'investor')}
               {currentUser && (hasFounder || hasInvestor) && renderLink('connections', 'Connections', 'connections')}
               {currentUser && hasAdmin && renderLink('admin', 'Admin Console', 'admin', 'Moderation, historical registry & imports')}

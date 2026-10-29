@@ -19,7 +19,7 @@ import { ConnectionsHub } from './components/connections/ConnectionsHub.tsx';
 import { StartupDetailModal } from './components/startup/StartupDetailModal.tsx';
 import { ComparisonTray } from './components/compare/ComparisonTray.tsx';
 import { ComparisonMatrix } from './components/compare/ComparisonMatrix.tsx';
-import { DiscoveryHero } from './components/home/DiscoveryHero.tsx';
+import { DiscoveryHero, HomeStory, ScrollProgress, CursorGlow, SectionRail, SlideInObserver } from './components/home/DiscoveryHero.tsx';
 import { ViewerDashboard } from './components/dashboard/ViewerDashboard.tsx';
 import { AdminReviewPage } from './components/admin/AdminReviewPage.tsx';
 import { AdminLayout, type AdminNavSection } from './components/admin/AdminLayout.tsx';
@@ -27,6 +27,7 @@ import { AdminOverview } from './components/admin/AdminOverview.tsx';
 import { AdminHistoricalManager } from './components/admin/AdminHistoricalManager.tsx';
 import { AdminCsvImports } from './components/admin/AdminCsvImports.tsx';
 import { HistoricalArchivePage } from './components/archive/HistoricalArchivePage.tsx';
+import { FounderArenaPage } from './components/arena/FounderArenaPage.tsx';
 import { NotFoundPage } from './components/notfound/NotFoundPage.tsx';
 import { computeRegistryMetrics } from './utils/registryMetrics.ts';
 import { fetchStartups } from './services/api.ts';
@@ -48,6 +49,7 @@ type KnownRoute =
   | 'profile'
   | 'settings'
   | 'founder'
+  | 'founder-arena'
   | 'investor'
   | 'connections'
   | 'admin'
@@ -72,6 +74,7 @@ const ROUTE_PATHS: Record<KnownRoute, string> = {
   profile: '/profile',
   settings: '/settings',
   founder: '/founder',
+  'founder-arena': '/founder/arena',
   investor: '/investor',
   connections: '/connections',
   admin: '/admin',
@@ -87,6 +90,7 @@ const AUTH_REQUIRED_ROUTES: AppRoute[] = [
   'profile',
   'settings',
   'founder',
+  'founder-arena',
   'investor',
   'connections',
   'admin',
@@ -105,6 +109,7 @@ const ROUTE_LABELS: Record<AppRoute, string> = {
   profile: 'Profile',
   settings: 'Account Settings',
   founder: 'Founder Workspace',
+  'founder-arena': 'Founder Battle Arena',
   investor: 'Investor Deal Room',
   connections: 'Connections',
   admin: 'Admin Console',
@@ -117,6 +122,7 @@ const ROUTE_LABELS: Record<AppRoute, string> = {
 const WORKSPACE_ROUTES: AppRoute[] = [
   'dashboard',
   'founder',
+  'founder-arena',
   'investor',
   'connections',
   'admin',
@@ -200,6 +206,17 @@ export const App: React.FC = () => {
   // Left navigation drawer
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const hamburgerRef = React.useRef<HTMLButtonElement>(null);
+  const topSearchRef = React.useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (topSearchRef.current) { e.preventDefault(); topSearchRef.current.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Detail Modal & Comparison Matrix States
   const [selectedDetailStartup, setSelectedDetailStartup] = useState<Startup | null>(null);
@@ -643,6 +660,9 @@ export const App: React.FC = () => {
 
   return (
     <main className="app-shell">
+      <CursorGlow />
+      <ScrollProgress />
+      <SlideInObserver />
       {/* 0. CINEMATIC SHARK VIDEO INTRO OVERLAY */}
       {introActive && (
         <CinematicIntro onComplete={handleIntroComplete} />
@@ -761,38 +781,25 @@ export const App: React.FC = () => {
               {currentUser && <button type="button" onClick={() => switchWorkspaceWithTransition('dashboard')}>Dashboard</button>}
             </nav>
             <form
-              className="topbar-search"
+              className="topbar-search topbar-search--pro"
               role="search"
               onSubmit={(e) => { e.preventDefault(); scrollToExplorer(); }}
             >
-              <span className="topbar-search-icon" aria-hidden="true">
-                <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
-                  <path
-                    d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
+              <span className="topbar-search-icon" aria-hidden="true">⌕</span>
               <input
+                ref={topSearchRef}
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search startups, sectors, cities…"
                 aria-label="Search startups"
               />
-              {search && (
-                <button
-                  type="button"
-                  className="topbar-search-clear"
-                  onClick={() => setSearch('')}
-                  aria-label="Clear search"
-                >
-                  ×
-                </button>
+              {search ? (
+                <button type="button" className="topbar-search-clear" aria-label="Clear search" onClick={() => setSearch('')}>×</button>
+              ) : (
+                <kbd aria-hidden="true">/</kbd>
               )}
+              <button type="submit" className="topbar-search-go" aria-label="Search">→</button>
             </form>
           </>
         )}
@@ -810,6 +817,7 @@ export const App: React.FC = () => {
           <nav className="topbar-links topbar-links--viewer" aria-label="Viewer Workspace navigation">
             <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Startup Explorer</button>
             <button type="button" onClick={() => navigateTo('archive')}>Shark Tank Archive</button>
+            <button type="button" onClick={() => navigateTo('founder-arena')}>Battle Arena ⚔</button>
             <button type="button" onClick={() => selectedForCompare.length >= 2 ? setIsMatrixOpen(true) : navigateTo('discovery')}>
               Compare {selectedForCompare.length > 0 ? `(${selectedForCompare.length})` : ''}
             </button>
@@ -822,6 +830,7 @@ export const App: React.FC = () => {
         {currentRoute === 'founder' && (
           <nav className="topbar-links topbar-links--founder" aria-label="Founder Studio navigation">
             <button type="button" className="is-current" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Founder Studio</button>
+            <button type="button" onClick={() => navigateTo('founder-arena')}>Battle Arena ⚔</button>
             <button type="button" onClick={() => navigateTo('connections')}>Inbound Inquiries</button>
             <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Public Explorer ↗</button>
             <button type="button" className="topbar-ws-picker-btn founder" onClick={() => setIsWorkspaceModalOpen(true)}>
@@ -960,6 +969,15 @@ export const App: React.FC = () => {
 
       {/* Workspace routes: rendered only once the server session has resolved. The role check
           here is a UX guard; every workspace API call is independently authorized by the backend. */}
+      {/* FOUNDER BATTLE ARENA ROUTE */}
+      {isInitialAuthDone && currentRoute === 'founder-arena' && (
+        currentUser && hasRole('FOUNDER') ? (
+          <FounderArenaPage />
+        ) : (
+          <WorkspaceGate {...gateProps} kind="founder" />
+        )
+      )}
+
       {isInitialAuthDone && currentRoute === 'founder' && (
         currentUser && hasRole('FOUNDER') ? (
           <FounderWorkspace
@@ -1053,6 +1071,7 @@ export const App: React.FC = () => {
       {currentRoute === 'discovery' && (
         <>
           {/* 2. MODERN FINANCE HERO & PLATFORM TELEMETRY */}
+          <SectionRail />
           <DiscoveryHero
             loading={loading}
             hasError={Boolean(error)}
@@ -1067,6 +1086,8 @@ export const App: React.FC = () => {
               scrollToExplorer();
             }}
           />
+
+          <HomeStory startups={startups} />
 
       {/* 3. STARTUP EXPLORER SECTION */}
       <section className="explorer" id="explorer">
@@ -1126,7 +1147,6 @@ export const App: React.FC = () => {
               placeholder="Search by brand, sector, city, stage..."
               aria-label="Search by brand, sector, city, or stage"
             />
-            <kbd>SEARCH</kbd>
           </label>
 
           <div

@@ -3,10 +3,10 @@
    ========================================================================== */
 
 .historical-archive-page {
-  background: var(--bg-navy, #0A1929);
+  background: #FAF8F5;
   min-height: calc(100vh - 72px);
-  padding: 36px 24px 80px;
-  color: var(--text-main, #0F172A);
+  padding: 32px 24px 80px;
+  color: #1E293B;
 }
 
 .archive-container {
@@ -25,7 +25,7 @@
   gap: 8px;
   margin-bottom: 16px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
+  color: #64748B;
 }
 
 .archive-back-btn {
@@ -49,7 +49,7 @@
 }
 
 .archive-crumb {
-  color: rgba(255, 255, 255, 0.85);
+  color: #334155;
 }
 
 .archive-eyebrow {
@@ -73,11 +73,11 @@
 
 .archive-title {
   font-family: var(--font-editorial, "Playfair Display", Georgia, serif);
-  font-size: 34px;
-  color: #FFFFFF;
-  margin: 0 0 10px;
+  font-size: 32px;
+  color: #0F172A;
+  margin: 0 0 8px;
   font-weight: 600;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.4px;
 }
 
 .archive-title span {
@@ -85,18 +85,18 @@
 }
 
 .archive-subtitle {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.7);
-  max-width: 760px;
-  line-height: 1.6;
-  margin: 0 0 28px;
+  font-size: 14px;
+  color: #475569;
+  max-width: 600px;
+  line-height: 1.5;
+  margin: 0 0 24px;
 }
 
 /* Tab Navigation */
 .archive-nav-tabs {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid #E2E8F0;
   padding-bottom: 0;
   overflow-x: auto;
 }
@@ -105,7 +105,7 @@
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  color: rgba(255, 255, 255, 0.65);
+  color: #64748B;
   padding: 12px 18px;
   font-size: 14px;
   font-weight: 600;
@@ -118,7 +118,7 @@
 }
 
 .archive-tab-btn:hover {
-  color: #FFFFFF;
+  color: #0F172A;
 }
 
 .archive-tab-btn.active {
@@ -128,7 +128,7 @@
 
 .tab-pill {
   display: inline-block;
-  background: rgba(195, 160, 100, 0.2);
+  background: #F4ECE0;
   color: var(--gold-accent, #C3A064);
   padding: 1px 7px;
   border-radius: 12px;
@@ -158,8 +158,8 @@
   border-radius: 12px;
   padding: 20px 24px;
   margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border: 1px solid #EAE3D6;
+  box-shadow: 0 2px 12px rgba(30, 20, 10, 0.04);
 }
 
 .selector-title {
@@ -170,16 +170,16 @@
 }
 
 .selector-title h2 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
-  color: var(--primary-navy, #0A1929);
+  color: #0F172A;
   margin: 0;
 }
 
 .selector-count {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text-muted, #64748B);
+  color: #94A3B8;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
@@ -193,34 +193,34 @@
 
 .season-pill {
   flex: 0 0 auto;
-  background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
+  background: #FDFCF9;
+  border: 1.5px solid #EAE3D6;
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 10px 14px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 3px;
   transition: all 180ms ease;
-  min-width: 130px;
+  min-width: 120px;
 }
 
 .season-pill:hover {
-  background: #F1F5F9;
-  border-color: #CBD5E1;
+  background: #F5EFE4;
+  border-color: #C3A064;
 }
 
 .season-pill.active {
-  background: #0A1929;
-  border-color: var(--gold-accent, #C3A064);
-  box-shadow: 0 0 0 1px var(--gold-accent, #C3A064);
+  background: #FAF5EA;
+  border-color: #C3A064;
+  box-shadow: 0 0 0 1px #C3A064, 0 3px 8px rgba(195, 160, 100, 0.15);
 }
 
 .pill-season-num {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
-  color: #0F172A;
+  color: #1E293B;
 }
 
 .season-pill.active .pill-season-num {
@@ -228,9 +228,9 @@
 }
 
 .pill-franchise {
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748B;
+  font-size: 10px;
+  font-weight: 700;
+  color: #94A3B8;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -241,17 +241,17 @@
 
 .pill-ep-count {
   font-size: 11px;
-  color: #94A3B8;
+  color: #64748B;
 }
 
 .season-pill.active .pill-ep-count {
-  color: rgba(255, 255, 255, 0.6);
+  color: #786337;
 }
 
 /* Selected Season Meta Card */
 .selected-season-meta-card {
-  background: #0F1E36;
-  border: 1px solid rgba(195, 160, 100, 0.3);
+  background: #FFFFFF;
+  border: 1px solid #EAE3D6;
   border-radius: 12px;
   padding: 24px;
   color: #FFFFFF;
@@ -263,7 +263,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #F1ECE3;
   padding-bottom: 16px;
 }
 
@@ -284,7 +284,7 @@
   font-family: var(--font-editorial, "Playfair Display", Georgia, serif);
   font-size: 26px;
   margin: 0;
-  color: #FFFFFF;
+  color: #0F172A;
 }
 
 .season-network {
@@ -316,7 +316,7 @@
 .meta-label {
   font-size: 11px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.5);
+  color: #64748B;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -358,20 +358,20 @@
 
 .episode-card {
   background: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 22px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #EAE3D6;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  box-shadow: 0 2px 12px rgba(30, 20, 10, 0.04);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 
 .episode-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: #CBD5E1;
+  box-shadow: 0 8px 24px rgba(30, 20, 10, 0.08);
+  border-color: #C3A064;
 }
 
 .episode-card-top {
@@ -384,8 +384,9 @@
 .episode-num-badge {
   font-size: 10px;
   font-weight: 800;
-  background: #0A1929;
+  background: rgba(195, 160, 100, 0.15);
   color: var(--gold-accent, #C3A064);
+  border: 1px solid rgba(195, 160, 100, 0.3);
   padding: 3px 8px;
   border-radius: 4px;
   letter-spacing: 1px;
@@ -393,14 +394,14 @@
 
 .episode-air-date {
   font-size: 12px;
-  color: #64748B;
+  color: #94A3B8;
 }
 
 .episode-title {
   font-family: var(--font-editorial, "Playfair Display", Georgia, serif);
   font-size: 18px;
   font-weight: 700;
-  color: #0A1929;
+  color: #0F172A;
   margin: 0 0 14px;
   line-height: 1.3;
 }
@@ -415,36 +416,41 @@
 .ep-tag {
   font-size: 11px;
   font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: #F1F5F9;
-  color: #475569;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #F5EFE6;
+  color: #5C4B2E;
+  border: 1px solid #E8DFD0;
 }
 
 .ep-tag.rating-tag {
-  background: #EFF6FF;
-  color: #1E40AF;
+  background: rgba(30, 64, 175, 0.2);
+  color: #93C5FD;
+  border-color: rgba(30, 64, 175, 0.4);
 }
 
 .ep-tag.viewers-tag {
-  background: #ECFDF5;
-  color: #065F46;
+  background: rgba(6, 95, 70, 0.25);
+  color: #6EE7B7;
+  border-color: rgba(6, 95, 70, 0.4);
 }
 
 .ep-tag.pitch-count-tag {
-  background: #FFFBEB;
-  color: #92400E;
+  background: rgba(146, 64, 14, 0.2);
+  color: #FCD34D;
+  border-color: rgba(146, 64, 14, 0.4);
 }
 
 .ep-tag.shark-count-tag {
-  background: #FAF5FF;
-  color: #6B21A8;
+  background: rgba(107, 33, 168, 0.25);
+  color: #D8B4FE;
+  border-color: rgba(107, 33, 168, 0.4);
 }
 
 .episode-explore-btn {
-  background: #0A1929;
-  color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #FAF6ED;
+  color: #8C6D2D;
+  border: 1px solid #D8C6A3;
   border-radius: 6px;
   padding: 10px 14px;
   font-size: 13px;
@@ -453,34 +459,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   transition: all 160ms ease;
-  width: 100%;
 }
 
 .episode-explore-btn:hover {
-  background: #132A46;
-  border-color: var(--gold-accent, #C3A064);
-  color: var(--gold-accent, #C3A064);
+  background: #C3A064;
+  color: #FFFFFF;
+  border-color: #C3A064;
 }
-
-/* Tab 2: Pitches Filters & Grid */
+  /* Tab 2: Pitches Filters & Grid */
+/* Tab 2: Pitches Filter Bar */
 .pitches-filter-bar {
   background: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 18px 20px;
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 1px solid #EAE3D6;
+  box-shadow: 0 2px 12px rgba(30, 20, 10, 0.04);
 }
 
 .pitches-search-box {
   display: flex;
   align-items: center;
-  background: #F8FAFC;
-  border: 1.5px solid #CBD5E1;
+  background: #FAF8F5;
+  border: 1.5px solid #E2D9CC;
   border-radius: 8px;
   padding: 8px 14px;
   gap: 10px;
@@ -495,6 +501,10 @@
   color: #0F172A;
 }
 
+.pitches-search-box input::placeholder {
+  color: #64748B;
+}
+
 .pitches-dropdowns {
   display: flex;
   flex-wrap: wrap;
@@ -503,14 +513,19 @@
 }
 
 .filter-select-label select {
-  background: #F8FAFC;
-  border: 1.5px solid #CBD5E1;
-  border-radius: 6px;
+  background: #FAF8F5;
+  border: 1.5px solid #E2D9CC;
+  border-radius: 8px;
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
   color: #334155;
   cursor: pointer;
+}
+
+.filter-select-label select option {
+  background: #0B1D31;
+  color: #FFFFFF;
 }
 
 .filter-select-label select:focus {
@@ -520,7 +535,7 @@
 .archive-reset-filters-btn {
   background: none;
   border: none;
-  color: #DC2626;
+  color: #F87171;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -530,12 +545,12 @@
 
 .pitches-count-row {
   margin-bottom: 18px;
-  color: rgba(255, 255, 255, 0.7);
+  color: #64748B;
   font-size: 13px;
 }
 
 .pitches-count-row strong {
-  color: #FFFFFF;
+  color: #0F172A;
 }
 
 .archive-pitches-grid {
@@ -546,35 +561,57 @@
 
 .archive-pitch-card {
   background: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 22px;
-  border: 1.5px solid #E2E8F0;
+  border: 1px solid #EAE3D6;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 
 .archive-pitch-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border-color: rgba(195, 160, 100, 0.4);
+}
+
+.archive-pitch-card h3 {
+  font-family: var(--font-editorial, "Playfair Display", Georgia, serif);
+  font-size: 20px;
+  color: #0F172A;
+  margin: 12px 0 4px;
+}
+
+.archive-pitch-card .legal-name {
+  font-size: 11px;
+  color: #64748B;
+  margin: 0 0 10px;
+}
+
+.archive-pitch-card .pitch-hook {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+  margin: 0 0 14px;
 }
 
 .pitch-seq-tag {
   font-size: 11px;
   font-weight: 700;
-  color: #64748B;
-  background: #F1F5F9;
-  padding: 2px 6px;
+  color: var(--gold-accent, #C3A064);
+  background: rgba(195, 160, 100, 0.15);
+  border: 1px solid rgba(195, 160, 100, 0.25);
+  padding: 2px 8px;
   border-radius: 4px;
 }
 
 .deal-outcome-row {
-  margin: 16px 0;
-  padding: 10px 12px;
-  background: #F8FAFC;
-  border-radius: 6px;
-  border: 1px solid #E2E8F0;
+  margin: 14px 0;
+  padding: 8px 12px;
+  background: #FAF8F5;
+  border-radius: 8px;
+  border: 1px solid #EFEAE1;
 }
 
 .outcome-label {
@@ -621,9 +658,11 @@
 /* Tab 3: Sharks Roster */
 .sharks-toolbar {
   background: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 18px 20px;
   margin-bottom: 24px;
+  border: 1px solid #EAE3D6;
+  box-shadow: 0 2px 12px rgba(30, 20, 10, 0.04);
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -634,8 +673,8 @@
 .sharks-search-box {
   display: flex;
   align-items: center;
-  background: #F8FAFC;
-  border: 1.5px solid #CBD5E1;
+  background: #FAF8F5;
+  border: 1.5px solid #E2D9CC;
   border-radius: 8px;
   padding: 8px 14px;
   gap: 10px;
@@ -649,14 +688,16 @@
   width: 100%;
   font-size: 14px;
   outline: none;
+  color: #0F172A;
 }
 
 .shark-filter-group {
   display: flex;
   gap: 4px;
-  background: #F1F5F9;
+  background: #FAF8F5;
+  border: 1.5px solid #E2D9CC;
   padding: 3px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .shark-filter-btn {
@@ -665,15 +706,15 @@
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
-  border-radius: 4px;
-  color: #475569;
+  border-radius: 6px;
+  color: #64748B;
   cursor: pointer;
   transition: all 140ms ease;
 }
 
 .shark-filter-btn.active {
   background: #FFFFFF;
-  color: #0A1929;
+  color: #FFFFFF;
   font-weight: 700;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -686,9 +727,9 @@
 
 .shark-card {
   background: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 22px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #EAE3D6;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -698,8 +739,8 @@
 
 .shark-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: #CBD5E1;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border-color: rgba(195, 160, 100, 0.4);
 }
 
 .shark-card-header {
@@ -728,7 +769,7 @@
 .shark-identity-main h3 {
   font-family: var(--font-editorial, "Playfair Display", Georgia, serif);
   font-size: 19px;
-  color: #0A1929;
+  color: #0F172A;
   margin: 0 0 3px;
 }
 
@@ -753,7 +794,7 @@
   justify-content: space-between;
   margin-bottom: 18px;
   padding-top: 12px;
-  border-top: 1px solid #F1F5F9;
+  border-top: 1px solid #F1ECE3;
 }
 
 .shark-status-badge {
@@ -775,13 +816,13 @@
 
 .shark-episodes-badge {
   font-size: 12px;
-  color: #475569;
+  color: #CBD5E1;
 }
 
 .shark-pitches-link-btn {
-  background: #F8FAFC;
-  border: 1px solid #CBD5E1;
-  color: #0A1929;
+  background: #FAF6ED;
+  border: 1px solid #D8C6A3;
+  color: #8C6D2D;
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 13px;
@@ -795,9 +836,9 @@
 }
 
 .shark-pitches-link-btn:hover {
-  background: #0A1929;
+  background: #C3A064;
   color: #FFFFFF;
-  border-color: #0A1929;
+  border-color: #C3A064;
 }
 
 /* Tab 4: Statistics */
@@ -830,8 +871,8 @@
 
 .stats-block {
   background: #FFFFFF;
-  border-radius: 12px;
-  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  border: 1px solid #EAE3D6;
   padding: 22px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
@@ -843,7 +884,7 @@
 .stats-block-title h3 {
   font-size: 18px;
   font-weight: 700;
-  color: #0A1929;
+  color: #0F172A;
   margin: 0 0 4px;
 }
 
@@ -864,7 +905,7 @@
 }
 
 .stats-table th {
-  background: #F8FAFC;
+  background: rgba(15, 30, 54, 0.85);
   padding: 10px 14px;
   border-bottom: 2px solid #E2E8F0;
   font-size: 11px;
@@ -876,12 +917,12 @@
 
 .stats-table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #F1F5F9;
+  border-bottom: 1px solid #F3EFE8;
   color: #1E293B;
 }
 
 .stats-table tr:hover td {
-  background: #F8FAFC;
+  background: #FAF7F2;
 }
 
 .text-green {

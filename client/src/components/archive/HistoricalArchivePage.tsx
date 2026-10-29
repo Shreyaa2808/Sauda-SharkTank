@@ -301,15 +301,11 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
           </div>
 
           <div className="archive-header-title-block">
-            <div className="archive-eyebrow">
-              <span className="archive-eyebrow-line" />
-              <span>SHARK TANK ARCHIVE · BROADCAST VAULT</span>
-            </div>
             <h1 id="archive-page-heading" className="archive-title">
-              Televised Broadcasts & Outcomes<span>.</span>
+              Shark Tank Archive<span>.</span>
             </h1>
             <p className="archive-subtitle">
-              Browse broadcast seasons, episode seating, historical negotiation logs, and post-tank deal completions preserved in the Sauda registry.
+              Explore televised seasons, pitches, panel outcomes, and deal history.
             </p>
           </div>
 
@@ -362,8 +358,8 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
           <div className="archive-section seasons-section">
             <div className="season-selector-bar">
               <div className="selector-title">
-                <h2>Browse Seasons</h2>
-                <span className="selector-count">{seasons.length} Available</span>
+                <h2>Seasons</h2>
+                <span className="selector-count">{seasons.length} seasons</span>
               </div>
 
               {loadingSeasons ? (
@@ -441,7 +437,7 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
             <div className="episodes-list-block">
               <div className="episodes-block-header">
                 <h3>Episodes in Season {selectedSeason?.seasonNumber ?? ''}</h3>
-                <span className="episodes-count">{episodes.length} episodes recorded</span>
+                <span className="episodes-count">{episodes.length} episodes</span>
               </div>
 
               {loadingEpisodes ? (
@@ -498,7 +494,7 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
                         onClick={() => setSelectedEpisodeId(ep.episodeId)}
                         aria-label={`Inspect pitches and panel for Episode ${ep.episodeNumber}`}
                       >
-                        <span>Inspect Episode Archive</span>
+                        <span>View Episode</span>
                         <span aria-hidden="true">→</span>
                       </button>
                     </article>
@@ -649,14 +645,10 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
                   return (
                     <article className="archive-pitch-card" key={p.pitchId}>
                       <div className="card-topline">
-                        <span className="pitch-badge show">
-                          <span className="badge-dot" />
-                          SHARK TANK SHOW
-                        </span>
-                        <span className="pitch-number">{formatPitchNumber(p.pitchId)}</span>
                         <span className="pitch-seq-tag">
                           S{p.seasonNumber} · Ep {p.episodeNumber}
                         </span>
+                        <span className="pitch-number">{formatPitchNumber(p.pitchId)}</span>
                       </div>
 
                       <div className="company-monogram" aria-hidden="true">
@@ -688,17 +680,16 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
 
                       {/* Deal Outcome Badge */}
                       <div className="deal-outcome-row">
-                        <span className="outcome-label">BROADCAST OUTCOME:</span>
                         {p.dealStatus === 'COMPLETED' ? (
                           <span className="outcome-pill completed">
-                            ✓ Deal Closed {p.finalAgreedAmount ? `· ${formatCurrency(p.finalAgreedAmount)} for ${formatEquity(p.finalAgreedEquityPct)}` : ''}
+                            ✓ Deal Closed {p.finalAgreedAmount ? `· ${formatCurrency(p.finalAgreedAmount)} (${formatEquity(p.finalAgreedEquityPct)})` : ''}
                           </span>
                         ) : p.dealStatus === 'FELL_THROUGH' ? (
-                          <span className="outcome-pill fell-through">✕ Deal Fell Through Post-Show</span>
+                          <span className="outcome-pill fell-through">✕ Fell Through</span>
                         ) : p.dealStatus === 'PENDING_DUE_DILIGENCE' ? (
-                          <span className="outcome-pill pending">⏳ In Due Diligence</span>
+                          <span className="outcome-pill pending">⏳ Due Diligence</span>
                         ) : (
-                          <span className="outcome-pill walked">No Deal / Walked Away</span>
+                          <span className="outcome-pill walked">No Deal</span>
                         )}
                       </div>
 
@@ -803,7 +794,7 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
 
                     <div className="shark-card-meta">
                       <span className={`shark-status-badge ${sh.isGuestShark ? 'guest' : 'regular'}`}>
-                        {sh.isGuestShark ? 'Guest Shark' : 'Main Panel Shark'}
+                        {sh.isGuestShark ? 'Guest' : 'Main Shark'}
                       </span>
                       {sh.episodeCount !== undefined && (
                         <span className="shark-episodes-badge">
@@ -826,7 +817,7 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
                       }}
                       aria-label={`View broadcast pitches evaluated by ${sh.displayName}`}
                     >
-                      <span>Explore Deals Evaluated</span>
+                      <span>View Pitches</span>
                       <span aria-hidden="true">→</span>
                     </button>
                   </article>
@@ -841,12 +832,6 @@ export const HistoricalArchivePage: React.FC<HistoricalArchivePageProps> = ({
         {/* ========================================================================= */}
         {activeTab === 'statistics' && (
           <div className="archive-section statistics-section">
-            <div className="stats-header-banner">
-              <div>
-                <h2>Verified Broadcast Analytics</h2>
-                <p>Calculated directly from confirmed MySQL historical records. No estimated or fabricated rates.</p>
-              </div>
-            </div>
 
             {loadingStats ? (
               <div className="archive-loading-row" role="status">Calculating broadcast statistics from verified database records…</div>
