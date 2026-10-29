@@ -58,42 +58,15 @@
   inset: 0;
   z-index: 3;
   pointer-events: none;
-  /* Quiet ambient fill; the single moving beam is rendered above this layer. */
-  background: radial-gradient(
-    ellipse at 50% 100%,
-    rgba(214, 180, 119, 0.07),
-    transparent 65%
-  );
+  background:
+    radial-gradient(40% 36% at 14% 0%, rgba(224, 199, 151, 0.2), transparent 70%),
+    radial-gradient(34% 30% at 78% 0%, rgba(22, 141, 164, 0.22), transparent 70%);
   mix-blend-mode: screen;
+  animation: hero-light-breathe 9s ease-in-out infinite;
 }
 
-/* One broad, soft spotlight controlled by GSAP + ScrollTrigger. */
-.home-hero-spotlight {
-  position: absolute;
-  top: 5%;
-  left: 4%;
-  width: 22%;
-  height: 82%;
-  z-index: 4;
-  pointer-events: none;
-  opacity: 0.82;
-  background:
-    radial-gradient(
-      ellipse at 50% 86%,
-      rgba(255, 218, 158, 0.28),
-      rgba(255, 205, 125, 0.10) 38%,
-      transparent 72%
-    ),
-    linear-gradient(
-      to bottom,
-      rgba(255, 222, 170, 0.02),
-      rgba(255, 205, 125, 0.13) 58%,
-      rgba(255, 205, 125, 0.015)
-    );
-  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
-  filter: blur(12px);
-  mix-blend-mode: screen;
-  will-change: transform, opacity;
+@keyframes hero-light-breathe {
+  50% { opacity: 0.65; }
 }
 
 .home-hero-inner {
@@ -661,13 +634,6 @@
       linear-gradient(180deg, rgba(5, 14, 24, 0.82) 0%, rgba(5, 14, 24, 0.7) 50%, #06111C 100%);
   }
 
-  .home-hero-spotlight {
-    width: 30%;
-    height: 58%;
-    top: 12%;
-    filter: blur(16px);
-  }
-
   .home-hero {
     padding-bottom: 0;
   }
@@ -718,7 +684,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .home-hero-lights,
-  .home-hero-spotlight,
   .rp-skel,
   .spotlight-card {
     animation: none;
@@ -906,3 +871,52 @@
 .home-story .home-story-step h3 { color: #FFFFFF; }
 .home-story .home-story-step p { color: rgba(255, 255, 255, 0.72); }
 .home-story .home-story-head h2 span { -webkit-text-fill-color: transparent; }
+
+/* Cards slide in from the right */
+.home-story-step[data-reveal] { transform: translateX(120px); }
+.home-story-step[data-reveal].is-in { transform: none; }
+.home-story-step[data-reveal] { transition-duration: 1s; }
+
+/* Cursor glow */
+.cursor-glow { position: fixed; top: 0; left: 0; width: 520px; height: 520px; border-radius: 50%; pointer-events: none; z-index: 40; opacity: 0; transition: opacity .5s; mix-blend-mode: screen;
+  background: radial-gradient(circle, rgba(224,199,151,.16) 0%, rgba(22,141,164,.08) 38%, transparent 68%); }
+
+/* Scroll shark */
+
+
+/* Shark: always visible, gently bobbing */
+.shark-bob { animation: shark-bob 3.2s ease-in-out infinite; }
+@keyframes shark-bob { 50% { transform: translateY(-4px) scaleY(1.04); } }
+
+/* Slide in from the right */
+
+/* CTA card */
+.home-cta-card { position: relative; margin-top: clamp(32px, 6vh, 56px); padding: 36px clamp(24px, 4vw, 48px); display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; border-radius: 22px; background: linear-gradient(120deg, rgba(22,141,164,.22), rgba(195,160,100,.16)), #0A1C2C; border: 1px solid rgba(224,199,151,.3); box-shadow: 0 0 60px rgba(22,141,164,.15); }
+.home-story .home-cta-card h3 { margin: 0 0 6px; font-family: var(--font-editorial, Georgia, serif); font-size: clamp(24px, 3vw, 34px); color: #fff; }
+.home-story .home-cta-card p { margin: 0; color: rgba(255,255,255,.72); }
+@media (prefers-reduced-motion: reduce) { .slide-r { opacity: 1; transform: none; transition: none; } .shark-bob { animation: none; } }
+
+/* Slide in from the right (animation, so hover transforms keep working) */
+.slide-r { opacity: 0; }
+.slide-r.is-in { opacity: 1; animation: slide-from-right .85s cubic-bezier(.2,.7,.2,1) backwards; }
+@keyframes slide-from-right { from { opacity: 0; transform: translateX(110px); } to { opacity: 1; transform: none; } }
+
+/* Cursor glow: visible on light and dark pages */
+.cursor-glow { mix-blend-mode: normal; z-index: 9990;
+  background: radial-gradient(circle, rgba(212,170,90,.20) 0%, rgba(22,141,164,.09) 38%, transparent 68%); }
+
+/* Story cards: light follows the pointer inside the card */
+.home-story-step { overflow: hidden; }
+.home-story-step::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(224,199,151,.22), transparent 70%); }
+.home-story-step:hover::before { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .slide-r { opacity: 1; } .slide-r.is-in { animation: none; } }
+
+/* Section rail */
+.section-rail { position: fixed; right: 22px; top: 50%; transform: translateY(-50%); z-index: 9970; display: flex; flex-direction: column; gap: 18px; align-items: flex-end; }
+.section-rail a { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.section-rail span { font-size: 11px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: #fff; background: rgba(6,17,28,.88); padding: 5px 10px; border-radius: 999px; opacity: 0; transform: translateX(8px); transition: opacity .25s, transform .25s; pointer-events: none; white-space: nowrap; }
+.section-rail a:hover span, .section-rail a:focus-visible span, .section-rail a.on span { opacity: 1; transform: none; }
+.section-rail i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #C3A064; background: rgba(6,17,28,.6); transition: transform .3s, background .3s, box-shadow .3s; }
+.section-rail a.on i { background: #C3A064; transform: scale(1.5); box-shadow: 0 0 0 5px rgba(195,160,100,.25); }
+@media (max-width: 860px) { .section-rail { display: none; } }

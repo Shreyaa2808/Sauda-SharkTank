@@ -1,13 +1,8 @@
 import React from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { useGSAP } from '@gsap/react';
 import type { Startup } from '../../types/startup.ts';
 import type { RegistryMetrics } from '../../utils/registryMetrics.ts';
 import { formatCurrencyCompact, formatEquity } from '../../utils/formatters.ts';
 import './DiscoveryHero.css';
-
-gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 interface DiscoveryHeroProps {
   loading: boolean;
@@ -93,6 +88,102 @@ export const ScrollProgress: React.FC = () => {
   return <div className="scroll-progress" aria-hidden="true"><div ref={ref} /></div>;
 };
 
+/** Soft spotlight that follows the pointer (desktop, motion-OK only). */
+export const CursorGlow: React.FC = () => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce), (pointer: coarse)').matches) return;
+    let x = window.innerWidth / 2, y = window.innerHeight / 2, cx = x, cy = y, raf = 0;
+    const tick = () => {
+      cx += (x - cx) * 0.14;
+      cy += (y - cy) * 0.14;
+      if (ref.current) ref.current.style.transform = `translate3d(${cx - 260}px, ${cy - 260}px, 0)`;
+      raf = requestAnimationFrame(tick);
+    };
+    const onMove = (e: MouseEvent) => { x = e.clientX; y = e.clientY; if (ref.current) ref.current.style.opacity = '1'; };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    raf = requestAnimationFrame(tick);
+    return () => { window.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf); };
+  }, []);
+  return <div className="cursor-glow" ref={ref} aria-hidden="true" />;
+};
+
+const RAIL_ITEMS = [
+  { id: 'hero', label: 'Home' },
+  { id: 'story', label: 'How it works' },
+  { id: 'explorer', label: 'Ventures' },
+];
+
+/** Right-edge dot rail that shows which section you're in and jumps between them. */
+export const SectionRail: React.FC = () => {
+  const [active, setActive] = React.useState('hero');
+  React.useEffect(() => {
+    const els = RAIL_ITEMS.map((r) => document.getElementById(r.id)).filter(Boolean) as HTMLElement[];
+    if (typeof IntersectionObserver === 'undefined' || !els.length) return;
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) setActive(e.target.id); }),
+      { rootMargin: '-45% 0px -50% 0px' },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+  return (
+    <nav className="section-rail" aria-label="Page sections">
+      {RAIL_ITEMS.map((r) => (
+        <a
+          key={r.id}
+          href={`#${r.id}`}
+          className={active === r.id ? 'on' : ''}
+          aria-label={r.label}
+          aria-current={active === r.id ? 'true' : undefined}
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById(r.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        >
+          <span>{r.label}</span>
+          <i />
+        </a>
+      ))}
+    </nav>
+  );
+};
+
+/** Slides cards and section blocks in from the right as they enter the viewport, site-wide. */
+export const SlideInObserver: React.FC = () => {
+  React.useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || typeof IntersectionObserver === 'undefined') return;
+    const SEL = '.startup-card, .section-heading, .toolbar, .results-bar';
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          const el = e.target as HTMLElement;
+          const siblings = el.parentElement ? Array.from(el.parentElement.children) : [];
+          el.style.animationDelay = `${(siblings.indexOf(el) % 3) * 90}ms`;
+          el.classList.add('is-in');
+          io.unobserve(el);
+        });
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
+    );
+    const seen = new WeakSet<Element>();
+    const scan = () => {
+      document.querySelectorAll<HTMLElement>(SEL).forEach((el) => {
+        if (seen.has(el) || el.classList.contains('skeleton-card')) return;
+        seen.add(el);
+        el.classList.add('slide-r');
+        io.observe(el);
+      });
+    };
+    scan();
+    const mo = new MutationObserver(scan);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => { mo.disconnect(); io.disconnect(); };
+  }, []);
+  return null;
+};
+
 const STORY_STEPS = [
   { n: '01', title: 'Discover', body: 'Browse televised Shark Tank pitches and platform listings, always labelled so you know the source.' },
   { n: '02', title: 'Evaluate', body: 'Open any venture to see the ask, equity, sector and stage side by side with its peers.' },
@@ -107,7 +198,7 @@ export const HomeStory: React.FC<{ startups: Startup[]; onExplore: () => void }>
   const loop = names.length ? [...names, ...names] : [];
 
   return (
-    <section className="home-story" ref={ref} aria-labelledby="home-story-title">
+    <section className="home-story" id="story" ref={ref} aria-labelledby="home-story-title">
       {loop.length > 0 && (
         <div className="home-marquee" aria-hidden="true">
           <div className="home-marquee-track">
@@ -126,7 +217,17 @@ export const HomeStory: React.FC<{ startups: Startup[]; onExplore: () => void }>
 
         <ol className="home-story-steps">
           {STORY_STEPS.map((st, i) => (
-            <li key={st.n} className="home-story-step" data-reveal style={{ ['--d' as string]: `${i * 120}ms` }}>
+            <li
+              key={st.n}
+              className="home-story-step"
+              data-reveal
+              style={{ ['--d' as string]: `${i * 120}ms` }}
+              onMouseMove={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`);
+                e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`);
+              }}
+            >
               <span className="home-story-num">{st.n}</span>
               <h3>{st.title}</h3>
               <p>{st.body}</p>
@@ -134,7 +235,11 @@ export const HomeStory: React.FC<{ startups: Startup[]; onExplore: () => void }>
           ))}
         </ol>
 
-        <div className="home-story-cta" data-reveal>
+        <div className="home-cta-card" data-reveal>
+          <div>
+            <h3>Ready to take the stage?</h3>
+            <p>Step into the registry and find the venture worth your next conversation.</p>
+          </div>
           <button type="button" className="home-btn home-btn-primary" onClick={onExplore}>
             <span>Start exploring</span>
             <span aria-hidden="true">→</span>
@@ -314,36 +419,8 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
   const compactScreen = useMediaQuery('(max-width: 768px)');
   const [videoFailed, setVideoFailed] = React.useState(false);
   const showVideo = !reducedMotion && !compactScreen && !videoFailed;
-  const heroRef = React.useRef<HTMLElement | null>(null);
 
-  useGSAP(
-    () => {
-      // Keep the lighting static for reduced-motion users and compact screens.
-      if (reducedMotion || compactScreen) return;
-
-      const spotlight = heroRef.current?.querySelector<HTMLElement>('.home-hero-spotlight');
-      if (!spotlight || !heroRef.current) return;
-
-      gsap.fromTo(
-        spotlight,
-        { xPercent: 0, opacity: 0.82 },
-        {
-          xPercent: 350,
-          opacity: 0.06,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: heroRef.current,
-            start: 'top top',
-            end: 'bottom top',
-            scrub: 1,
-            invalidateOnRefresh: true,
-          },
-        },
-      );
-    },
-    { scope: heroRef, dependencies: [reducedMotion, compactScreen], revertOnUpdate: true },
-  );
-
+  const heroRef = React.useRef<HTMLElement>(null);
   React.useEffect(() => {
     if (reducedMotion) return;
     let raf = 0;
@@ -364,7 +441,7 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
   }, [reducedMotion]);
 
   return (
-    <section ref={heroRef} className="home-hero" id="hero" aria-labelledby="home-hero-title">
+    <section className="home-hero" id="hero" ref={heroRef} aria-labelledby="home-hero-title">
       <div className="home-hero-stage" aria-hidden="true">
         {showVideo && (
           <video
@@ -382,7 +459,6 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
         )}
         <div className="home-hero-poster" style={{ backgroundImage: `url(${VIDEO_POSTER})` }} />
         <div className="home-hero-shade" />
-        <div className="home-hero-spotlight" />
         <div className="home-hero-lights" />
       </div>
 

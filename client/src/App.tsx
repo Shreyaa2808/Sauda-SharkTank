@@ -19,7 +19,7 @@ import { ConnectionsHub } from './components/connections/ConnectionsHub.tsx';
 import { StartupDetailModal } from './components/startup/StartupDetailModal.tsx';
 import { ComparisonTray } from './components/compare/ComparisonTray.tsx';
 import { ComparisonMatrix } from './components/compare/ComparisonMatrix.tsx';
-import { DiscoveryHero, HomeStory, ScrollProgress } from './components/home/DiscoveryHero.tsx';
+import { DiscoveryHero, HomeStory, ScrollProgress, CursorGlow, SectionRail, SlideInObserver } from './components/home/DiscoveryHero.tsx';
 import { ViewerDashboard } from './components/dashboard/ViewerDashboard.tsx';
 import { AdminReviewPage } from './components/admin/AdminReviewPage.tsx';
 import { AdminLayout, type AdminNavSection } from './components/admin/AdminLayout.tsx';
@@ -643,6 +643,8 @@ export const App: React.FC = () => {
 
   return (
     <main className="app-shell">
+      <CursorGlow />
+      <SlideInObserver />
       {/* 0. CINEMATIC SHARK VIDEO INTRO OVERLAY */}
       {introActive && (
         <CinematicIntro onComplete={handleIntroComplete} />
@@ -1034,6 +1036,7 @@ export const App: React.FC = () => {
         <>
           {/* 2. MODERN FINANCE HERO & PLATFORM TELEMETRY */}
           <ScrollProgress />
+          <SectionRail />
           <DiscoveryHero
             loading={loading}
             hasError={Boolean(error)}
