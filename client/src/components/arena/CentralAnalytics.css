@@ -1,37 +1,40 @@
-/* Floating Central Analytical Interface - Inspired by Reference Images 2 & 3 */
+/* Floating Central Analytical Interface - Expanded Scale for True Cinematic Presence */
 .central-analytics-card {
   position: relative;
-  width: 520px;
+  width: 570px;
   max-width: 90vw;
-  background: rgba(5, 14, 28, 0.78);
-  border: 1px solid rgba(0, 216, 246, 0.35);
+  background: rgba(5, 15, 32, 0.85);
+  border: 1px solid rgba(0, 216, 246, 0.42);
   box-shadow:
-    0 0 40px rgba(0, 216, 246, 0.15),
-    inset 0 0 30px rgba(0, 216, 246, 0.08),
-    0 30px 80px rgba(0, 0, 0, 0.85);
-  border-radius: 14px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: 24px;
+    0 0 50px rgba(0, 216, 246, 0.2),
+    inset 0 0 38px rgba(0, 216, 246, 0.12),
+    0 30px 80px rgba(0, 0, 0, 0.9);
+  border-radius: 16px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   z-index: 10;
   transition: all 0.4s ease;
   user-select: none;
+  box-sizing: border-box;
 }
 
 @media (min-width: 1440px) {
   .central-analytics-card {
-    width: 580px;
+    width: 630px;
+    padding: 26px 28px;
+    gap: 18px;
   }
 }
 
 /* Cyber corner brackets */
 .analytics-corner {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   pointer-events: none;
 }
 
@@ -65,15 +68,15 @@
 
 /* Header */
 .analytics-header {
-  border-bottom: 1px solid rgba(0, 216, 246, 0.15);
-  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 216, 246, 0.18);
+  padding-bottom: 10px;
 }
 
 .analytics-tag-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .live-telemetry-tag {
@@ -82,7 +85,7 @@
   gap: 6px;
   font-size: 0.65rem;
   letter-spacing: 0.14em;
-  font-weight: 700;
+  font-weight: 800;
   color: #00d8f6;
   text-transform: uppercase;
 }
@@ -100,12 +103,12 @@
   font-size: 0.65rem;
   color: #94a3b8;
   letter-spacing: 0.08em;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .analytics-main-title {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.06em;
   color: #ffffff;
   margin: 0;
@@ -114,8 +117,8 @@
 
 /* Investment Capacity Bars */
 .analytics-section {
-  background: rgba(3, 11, 24, 0.5);
-  border: 1px solid rgba(0, 216, 246, 0.12);
+  background: rgba(3, 11, 24, 0.6);
+  border: 1px solid rgba(0, 216, 246, 0.16);
   border-radius: 8px;
   padding: 12px 14px;
 }
@@ -123,12 +126,12 @@
 .section-label-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .section-title {
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.1em;
   color: #38bdf8;
   text-transform: uppercase;
@@ -153,10 +156,10 @@
 }
 
 .capacity-name {
-  width: 110px;
-  font-size: 0.72rem;
+  width: 140px;
+  font-size: 0.74rem;
   color: #e2e8f0;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -169,7 +172,7 @@
   background: rgba(255, 255, 255, 0.06);
   border-radius: 4px;
   overflow: visible;
-  border: 1px solid rgba(0, 216, 246, 0.2);
+  border: 1px solid rgba(0, 216, 246, 0.25);
 }
 
 .capacity-fill {
@@ -180,12 +183,12 @@
 
 .fill-cyan {
   background: linear-gradient(90deg, #00d8f6 0%, #38bdf8 100%);
-  box-shadow: 0 0 10px rgba(0, 216, 246, 0.5);
+  box-shadow: 0 0 10px rgba(0, 216, 246, 0.6);
 }
 
 .fill-teal {
   background: linear-gradient(90deg, #2dd4bf 0%, #14b8a6 100%);
-  box-shadow: 0 0 10px rgba(45, 212, 191, 0.5);
+  box-shadow: 0 0 10px rgba(45, 212, 191, 0.6);
 }
 
 .capacity-marker {
@@ -202,7 +205,7 @@
   font-size: 0.8rem;
   font-weight: 800;
   color: #ffffff;
-  width: 36px;
+  width: 38px;
   text-align: right;
 }
 
@@ -214,10 +217,10 @@
 }
 
 .mid-sub-panel {
-  background: rgba(3, 11, 24, 0.5);
-  border: 1px solid rgba(0, 216, 246, 0.12);
+  background: rgba(3, 11, 24, 0.6);
+  border: 1px solid rgba(0, 216, 246, 0.16);
   border-radius: 8px;
-  padding: 12px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -225,7 +228,7 @@
 
 .sub-panel-title {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.1em;
   color: #94a3b8;
   margin-bottom: 8px;
@@ -240,11 +243,11 @@
 }
 
 .dual-metric-box {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.35);
   padding: 8px 6px;
   border-radius: 6px;
   text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .dual-box-lbl {
@@ -255,46 +258,52 @@
 }
 
 .dual-box-val {
-  font-size: 1.15rem;
-  font-weight: 800;
-  line-height: 1.2;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1.15;
+  margin: 2px 0;
 }
 
 .dual-box-desc {
-  font-size: 0.6rem;
-  color: #94a3b8;
+  font-size: 0.62rem;
+  color: #cbd5e1;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .text-cyan {
   color: #00d8f6;
-  text-shadow: 0 0 10px rgba(0, 216, 246, 0.4);
+  text-shadow: 0 0 10px rgba(0, 216, 246, 0.5);
 }
 
 .text-teal {
   color: #2dd4bf;
-  text-shadow: 0 0 10px rgba(45, 212, 191, 0.4);
+  text-shadow: 0 0 10px rgba(45, 212, 191, 0.5);
 }
 
 .sub-metrics-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   padding-top: 8px;
 }
 
 .sub-metric-item {
   display: flex;
   justify-content: space-between;
-  font-size: 0.62rem;
+  font-size: 0.65rem;
 }
 
 .sub-metric-lbl {
   color: #64748b;
+  font-weight: 600;
 }
 
 .sub-metric-val {
-  font-weight: 700;
+  font-weight: 800;
   color: #f1f5f9;
 }
 
@@ -358,7 +367,7 @@
 
 .gauge-pct {
   font-size: 0.85rem;
-  font-weight: 800;
+  font-weight: 900;
   color: #ffffff;
   line-height: 1;
 }
@@ -366,8 +375,9 @@
 .gauge-lbl {
   font-size: 0.48rem;
   color: #64748b;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.06em;
+  margin-top: 1px;
 }
 
 .gauge-caption {
@@ -379,7 +389,7 @@
 
 /* Sparklines histogram */
 .sparkline-bar-group {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   padding-top: 8px;
 }
 
@@ -396,7 +406,7 @@
   display: flex;
   align-items: flex-end;
   gap: 4px;
-  height: 24px;
+  height: 22px;
 }
 
 .mini-bar {
@@ -408,38 +418,39 @@
 
 /* Bottom Table */
 .analytics-bottom-table {
-  background: rgba(3, 11, 24, 0.5);
-  border: 1px solid rgba(0, 216, 246, 0.12);
+  background: rgba(3, 11, 24, 0.6);
+  border: 1px solid rgba(0, 216, 246, 0.16);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
 }
 
 .table-header-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
   font-size: 0.58rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #64748b;
   letter-spacing: 0.08em;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .table-data-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
   align-items: center;
-  font-size: 0.65rem;
+  font-size: 0.66rem;
   padding: 5px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .cat-name {
   color: #cbd5e1;
+  font-weight: 600;
 }
 
 .cat-diff {
   color: #e2e8f0;
   font-weight: 700;
-  font-size: 0.62rem;
+  font-size: 0.64rem;
 }

@@ -1,7 +1,7 @@
-
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import fs from 'node:fs';
+import path from 'node:path';
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -14,6 +14,7 @@ function requiredEnv(name: string): string {
 }
 
 const port = Number(process.env.DB_PORT ?? '3306');
+
 const connectionLimit = Number(
   process.env.DB_CONNECTION_LIMIT ?? '5'
 );
@@ -27,6 +28,7 @@ if (!Number.isInteger(connectionLimit) || connectionLimit < 1) {
 }
 
 const database = requiredEnv('DB_NAME');
+
 const isDisposableTestDb = /^sauda_test_[a-z0-9_]+$/i.test(database);
 
 const host =
@@ -50,7 +52,13 @@ const isAiven = host.endsWith(
 
 const ssl = isAiven
   ? {
-      ca: fs.readFileSync('/Users/shreya/Downloads/ca.pem', 'utf8'),
+      ca: fs.readFileSync(
+        path.resolve(
+          process.env.DB_CA_CERT_PATH ??
+            path.join(process.cwd(), 'certs', 'ca.pem')
+        ),
+        'utf8'
+      ),
       rejectUnauthorized: true
     }
   : undefined;
@@ -66,3 +74,4 @@ export const dbPool = mysql.createPool({
   connectionLimit,
   queueLimit: 0
 });
+

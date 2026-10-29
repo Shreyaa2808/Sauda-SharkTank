@@ -61,10 +61,10 @@ export const ArenaScene: React.FC<ArenaSceneProps> = ({
         {/* CENTER COLUMN: Floating Central Analytical Interface + SVG Animated Data Streams */}
         <div className="arena-col col-center">
           {/* Animated Cyan Energy/Data Streams traveling between towers and analytics (Ref 1 & 3) */}
-          <svg className="arena-data-streams-svg" viewBox="0 0 800 240" fill="none">
+          <svg className="arena-data-streams-svg" viewBox="0 0 860 220" fill="none">
             {/* Stream Left -> Center */}
             <path
-              d="M 20 120 C 180 30, 240 180, 400 120"
+              d="M 10 110 C 190 20, 270 200, 430 110"
               stroke="#00d8f6"
               strokeWidth="2.5"
               strokeDasharray="8 6"
@@ -72,14 +72,14 @@ export const ArenaScene: React.FC<ArenaSceneProps> = ({
             />
             {/* Stream Right -> Center */}
             <path
-              d="M 780 120 C 620 30, 560 180, 400 120"
+              d="M 850 110 C 670 20, 590 200, 430 110"
               stroke="#2dd4bf"
               strokeWidth="2.5"
               strokeDasharray="8 6"
               className="stream-path-right"
             />
             {/* Ambient Convergence Glow at center */}
-            <circle cx="400" cy="120" r="16" fill="#00d8f6" filter="blur(8px)" opacity="0.6" />
+            <circle cx="430" cy="110" r="18" fill="#00d8f6" filter="blur(8px)" opacity="0.6" />
           </svg>
 
           <CentralAnalytics battle={battle} />

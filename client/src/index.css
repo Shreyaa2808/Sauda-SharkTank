@@ -165,3 +165,45 @@ a:focus-visible,
 html {
   scrollbar-gutter: stable;
 }
+
+
+/* ==========================================================================
+   Universal Scrollbar Concealment - Hide scrollbars everywhere in the app
+   while fully maintaining touch, mousewheel, trackpad, and keyboard scroll
+   ========================================================================== */
+html,
+body,
+#root,
+div,
+main,
+section,
+article,
+aside,
+nav,
+ul,
+ol,
+li,
+table,
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar,
+div::-webkit-scrollbar,
+main::-webkit-scrollbar,
+section::-webkit-scrollbar,
+article::-webkit-scrollbar,
+aside::-webkit-scrollbar,
+nav::-webkit-scrollbar,
+ul::-webkit-scrollbar,
+ol::-webkit-scrollbar,
+li::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
