@@ -106,7 +106,7 @@ export const AdminReviewPage: React.FC<AdminReviewPageProps> = ({ authorized, on
   const [queue, setQueue] = useState<ReviewPitch[]>([]);
   const [selectedPitchId, setSelectedPitchId] = useState<number | null>(null);
   const [detail, setDetail] = useState<{ pitch: ReviewPitch; history: ReviewHistoryItem[] } | null>(null);
-  const [queueLoading, setQueueLoading] = useState(true);
+  const [queueLoading, setQueueLoading] = useState(authorized);
   const [queueError, setQueueError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -134,10 +134,7 @@ export const AdminReviewPage: React.FC<AdminReviewPageProps> = ({ authorized, on
   }, []);
 
   useEffect(() => {
-    if (!authorized) {
-      setQueueLoading(false);
-      return;
-    }
+    if (!authorized) return;
     const controller = new AbortController();
     void refreshQueue(controller.signal);
     return () => controller.abort();
@@ -145,21 +142,28 @@ export const AdminReviewPage: React.FC<AdminReviewPageProps> = ({ authorized, on
 
   useEffect(() => {
     if (!authorized || selectedPitchId === null) {
-      setDetail(null);
-      setDetailError(null);
-      setDetailLoading(false);
       return;
     }
     const controller = new AbortController();
-    setDetail(null);
-    setDetailError(null);
-    setDetailLoading(true);
-    fetchReviewDetail(selectedPitchId, controller.signal)
-      .then((value) => { if (!controller.signal.aborted) setDetail(value); })
-      .catch((error) => {
-        if (!controller.signal.aborted) setDetailError(error instanceof Error ? error.message : 'Unable to load pitch details.');
-      })
-      .finally(() => { if (!controller.signal.aborted) setDetailLoading(false); });
+    void (async () => {
+      setDetail(null);
+      setDetailError(null);
+      setDetailLoading(true);
+      try {
+        const value = await fetchReviewDetail(selectedPitchId, controller.signal);
+        if (!controller.signal.aborted) {
+          setDetail(value);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setDetailError(error instanceof Error ? error.message : 'Unable to load pitch details.');
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setDetailLoading(false);
+        }
+      }
+    })();
     return () => controller.abort();
   }, [authorized, selectedPitchId, detailReloadKey]);
 

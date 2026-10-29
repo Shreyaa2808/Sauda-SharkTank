@@ -10,6 +10,7 @@ import { AccountMenu } from './components/auth/AccountMenu.tsx';
 import { ProfilePage } from './components/profile/ProfilePage.tsx';
 import { AccountSettingsPage } from './components/settings/AccountSettingsPage.tsx';
 import { WorkspaceChooserModal } from './components/workspace/WorkspaceChooserModal.tsx';
+import { WorkspaceTransition, type WorkspaceType } from './components/workspace/WorkspaceTransition.tsx';
 import { NavDrawer } from './components/navigation/NavDrawer.tsx';
 import { WorkspaceGate } from './components/workspace/WorkspaceGate.tsx';
 import { FounderWorkspace } from './components/founder/FounderWorkspace.tsx';
@@ -25,6 +26,7 @@ import { AdminLayout, type AdminNavSection } from './components/admin/AdminLayou
 import { AdminOverview } from './components/admin/AdminOverview.tsx';
 import { AdminHistoricalManager } from './components/admin/AdminHistoricalManager.tsx';
 import { AdminCsvImports } from './components/admin/AdminCsvImports.tsx';
+import { HistoricalArchivePage } from './components/archive/HistoricalArchivePage.tsx';
 import { NotFoundPage } from './components/notfound/NotFoundPage.tsx';
 import { computeRegistryMetrics } from './utils/registryMetrics.ts';
 import { fetchStartups } from './services/api.ts';
@@ -40,6 +42,7 @@ import {
 type FilterType = 'ALL' | PitchType;
 type KnownRoute =
   | 'discovery'
+  | 'archive'
   | 'login'
   | 'dashboard'
   | 'profile'
@@ -63,6 +66,7 @@ const MIN_LOADER_MS = 1400;
 // Single source of truth for the (History API based) route model.
 const ROUTE_PATHS: Record<KnownRoute, string> = {
   discovery: '/',
+  archive: '/archive',
   login: '/login',
   dashboard: '/dashboard',
   profile: '/profile',
@@ -95,6 +99,7 @@ const AUTH_REQUIRED_ROUTES: AppRoute[] = [
 const ROUTE_LABELS: Record<AppRoute, string> = {
   notfound: 'Page Not Found',
   discovery: 'Startup Discovery',
+  archive: 'Shark Tank Archive',
   login: 'Sign In',
   dashboard: 'Dashboard',
   profile: 'Profile',
@@ -201,6 +206,7 @@ export const App: React.FC = () => {
   const [selectedForCompare, setSelectedForCompare] = useState<Startup[]>([]);
   const [isMatrixOpen, setIsMatrixOpen] = useState<boolean>(false);
   const [compareWarning, setCompareWarning] = useState<string | null>(null);
+  const [archiveInitialTab, setArchiveInitialTab] = useState<'seasons' | 'pitches' | 'sharks' | 'statistics'>('seasons');
 
   // Navigation helper synchronized with browser History API.
   // `replace` is used for guard redirects so Back never lands on a page the guard just rejected.
@@ -265,6 +271,57 @@ export const App: React.FC = () => {
           ? 'admin-overview'
           : null;
   const currentRoute: AppRoute = guardRedirect ?? requestedRoute;
+
+  // Workspace Transition Animation State
+  const [transitionTarget, setTransitionTarget] = useState<{
+    workspace: WorkspaceType;
+    route: KnownRoute;
+  } | null>(null);
+
+  const switchWorkspaceWithTransition = useCallback(
+    (targetRoute: KnownRoute) => {
+      let targetWs: WorkspaceType | null = null;
+      if (targetRoute === 'founder') targetWs = 'founder';
+      else if (targetRoute === 'investor') targetWs = 'investor';
+      else if (targetRoute === 'admin' || targetRoute.startsWith('admin-')) targetWs = 'admin';
+      else if (['discovery', 'dashboard', 'archive'].includes(targetRoute)) {
+        if (['founder', 'investor', 'admin', 'admin-overview', 'admin-reviews', 'admin-historical', 'admin-imports'].includes(currentRoute)) {
+          targetWs = 'viewer';
+        }
+      }
+
+      // If no cross-workspace change or already at destination, navigate directly
+      if (
+        !targetWs ||
+        (targetWs === 'founder' && currentRoute === 'founder') ||
+        (targetWs === 'investor' && currentRoute === 'investor') ||
+        (targetWs === 'admin' && ADMIN_ROUTES.includes(currentRoute)) ||
+        (targetWs === 'viewer' && ['discovery', 'dashboard', 'archive'].includes(currentRoute))
+      ) {
+        navigateTo(targetRoute);
+        return;
+      }
+
+      const reduced =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) {
+        navigateTo(targetRoute);
+        return;
+      }
+
+      setTransitionTarget({ workspace: targetWs, route: targetRoute });
+    },
+    [currentRoute, navigateTo],
+  );
+
+  const handleTransitionComplete = useCallback(() => {
+    if (transitionTarget) {
+      const dest = transitionTarget.route;
+      setTransitionTarget(null);
+      navigateTo(dest);
+    }
+  }, [transitionTarget, navigateTo]);
 
   // Keep the address bar in step with a guard redirect (history only; no state updates here).
   useEffect(() => {
@@ -347,12 +404,30 @@ export const App: React.FC = () => {
     navigateTo('login');
   };
 
-  // Login success handler: resume the originally requested route when there was one
+  // Login success handler: resume deep link or show workspace selection/transition
   const handleLoginSuccess = (user: AuthUser) => {
     setCurrentUser(user);
     const resume = returnToRef.current;
     returnToRef.current = null;
-    navigateTo(resume ?? 'discovery');
+
+    if (resume) {
+      switchWorkspaceWithTransition(resume);
+      return;
+    }
+
+    // Check if user has multiple authorized destinations (e.g. VIEWER + FOUNDER/INVESTOR/ADMIN)
+    const hasMultiple =
+      user.roles.length > 1 ||
+      user.roles.some((r) => ['ADMIN', 'FOUNDER', 'INVESTOR'].includes(r));
+
+    if (hasMultiple) {
+      // Present the post-login destination selector so user chooses their preferred suite
+      setIsWorkspaceModalOpen(true);
+      navigateTo('dashboard', true);
+    } else {
+      // Single role (Viewer only): enter viewer dashboard with smooth transition
+      switchWorkspaceWithTransition('dashboard');
+    }
   };
 
   const gateProps = {
@@ -503,6 +578,12 @@ export const App: React.FC = () => {
 
     return (
       <>
+        {transitionTarget && (
+          <WorkspaceTransition
+            workspace={transitionTarget.workspace}
+            onComplete={handleTransitionComplete}
+          />
+        )}
         {introActive && (
           <CinematicIntro onComplete={handleIntroComplete} />
         )}
@@ -524,7 +605,7 @@ export const App: React.FC = () => {
                     : 'admin-overview';
             navigateTo(target);
           }}
-          onExitToPublic={() => navigateTo('dashboard')}
+          onExitToPublic={() => switchWorkspaceWithTransition('dashboard')}
           onLogout={handleLogout}
         >
           {adminSection === 'overview' && (
@@ -567,13 +648,35 @@ export const App: React.FC = () => {
         <CinematicIntro onComplete={handleIntroComplete} />
       )}
 
-      {/* 0.1 PREMIUM REFRESH / BOOTSTRAP LOADER */}
+      {/* 0.1 WORKSPACE TRANSITION MOTION OVERLAY */}
+      {transitionTarget && (
+        <WorkspaceTransition
+          workspace={transitionTarget.workspace}
+          onComplete={handleTransitionComplete}
+        />
+      )}
+
+      {/* 0.2 PREMIUM REFRESH / BOOTSTRAP LOADER */}
       {showBootstrapLoader && (
         <SaudaLoader message="Loading venture registry" />
       )}
 
-      {/* 1. DARK NAVY NAVIGATION HEADER */}
-      <header className={`topbar ${currentRoute === 'discovery' ? 'topbar--home' : ''}`}>
+      {/* 1. ROLE-ADAPTIVE NAVIGATION HEADER */}
+      <header
+        className={`topbar ${
+          currentRoute === 'discovery'
+            ? 'topbar--home'
+            : currentRoute === 'founder'
+              ? 'topbar--founder'
+              : currentRoute === 'investor'
+                ? 'topbar--investor'
+                : currentRoute === 'dashboard'
+                  ? 'topbar--viewer'
+                  : currentRoute === 'connections'
+                    ? 'topbar--connections'
+                    : ''
+        }`}
+      >
         <div className="topbar-left">
           <button
             ref={hamburgerRef}
@@ -625,18 +728,37 @@ export const App: React.FC = () => {
 
           <span className="topbar-context" aria-label="Current section">
             <span className="topbar-context-divider" aria-hidden="true" />
-            <span className="topbar-context-label">{ROUTE_LABELS[currentRoute]}</span>
+            <span
+              className={`topbar-context-label ${
+                currentRoute === 'founder'
+                  ? 'founder'
+                  : currentRoute === 'investor'
+                    ? 'investor'
+                    : currentRoute === 'dashboard'
+                      ? 'viewer'
+                      : ''
+              }`}
+            >
+              {currentRoute === 'founder'
+                ? 'FOUNDER STUDIO'
+                : currentRoute === 'investor'
+                  ? 'INVESTOR DEAL ROOM'
+                  : currentRoute === 'dashboard'
+                    ? 'VIEWER WORKSPACE'
+                    : ROUTE_LABELS[currentRoute]}
+            </span>
           </span>
         </div>
 
+        {/* Dynamic Topbar Navigation Links per Active Workspace */}
         {currentRoute === 'discovery' && (
           <>
             <nav className="topbar-links" aria-label="Homepage sections">
               <button type="button" className="is-current" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Home</button>
               <button type="button" onClick={() => { setFilter('ALL'); scrollToExplorer(); }}>Venture Registry</button>
-              <button type="button" onClick={() => { setSearch(''); setFilter('SHOW'); scrollToExplorer(); }}>Shark Tank Archive</button>
+              <button type="button" onClick={() => { navigateTo('archive'); }}>Shark Tank Archive</button>
               <button type="button" onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>About</button>
-              {currentUser && <button type="button" onClick={() => navigateTo('dashboard')}>Dashboard</button>}
+              {currentUser && <button type="button" onClick={() => switchWorkspaceWithTransition('dashboard')}>Dashboard</button>}
             </nav>
             <form
               className="topbar-search"
@@ -655,13 +777,79 @@ export const App: React.FC = () => {
           </>
         )}
 
+        {currentRoute === 'archive' && (
+          <nav className="topbar-links" aria-label="Archive navigation">
+            <button type="button" onClick={() => navigateTo('discovery')}>Home</button>
+            <button type="button" onClick={() => navigateTo('discovery')}>Venture Registry</button>
+            <button type="button" className="is-current" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Shark Tank Archive</button>
+            {currentUser && <button type="button" onClick={() => switchWorkspaceWithTransition('dashboard')}>Dashboard</button>}
+          </nav>
+        )}
+
+        {currentRoute === 'dashboard' && (
+          <nav className="topbar-links topbar-links--viewer" aria-label="Viewer Workspace navigation">
+            <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Startup Explorer</button>
+            <button type="button" onClick={() => navigateTo('archive')}>Shark Tank Archive</button>
+            <button type="button" onClick={() => selectedForCompare.length >= 2 ? setIsMatrixOpen(true) : navigateTo('discovery')}>
+              Compare {selectedForCompare.length > 0 ? `(${selectedForCompare.length})` : ''}
+            </button>
+            <button type="button" className="topbar-ws-picker-btn" onClick={() => setIsWorkspaceModalOpen(true)}>
+              Workspaces ▾
+            </button>
+          </nav>
+        )}
+
+        {currentRoute === 'founder' && (
+          <nav className="topbar-links topbar-links--founder" aria-label="Founder Studio navigation">
+            <button type="button" className="is-current" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Founder Studio</button>
+            <button type="button" onClick={() => navigateTo('connections')}>Inbound Inquiries</button>
+            <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Public Explorer ↗</button>
+            <button type="button" className="topbar-ws-picker-btn founder" onClick={() => setIsWorkspaceModalOpen(true)}>
+              Workspaces ▾
+            </button>
+          </nav>
+        )}
+
+        {currentRoute === 'investor' && (
+          <nav className="topbar-links topbar-links--investor" aria-label="Investor Deal Room navigation">
+            <button type="button" className="is-current" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Deal Room</button>
+            <button type="button" onClick={() => navigateTo('connections')}>Active Inquiries</button>
+            <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Public Explorer ↗</button>
+            <button type="button" className="topbar-ws-picker-btn investor" onClick={() => setIsWorkspaceModalOpen(true)}>
+              Workspaces ▾
+            </button>
+          </nav>
+        )}
+
+        {currentRoute === 'connections' && (
+          <nav className="topbar-links topbar-links--connections" aria-label="Connections navigation">
+            <button type="button" className="is-current" aria-current="page">Connections Hub</button>
+            {hasRole('FOUNDER') && (
+              <button type="button" onClick={() => switchWorkspaceWithTransition('founder')}>Founder Studio</button>
+            )}
+            {hasRole('INVESTOR') && (
+              <button type="button" onClick={() => switchWorkspaceWithTransition('investor')}>Deal Room</button>
+            )}
+            <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Public Explorer ↗</button>
+            <button type="button" className="topbar-ws-picker-btn" onClick={() => setIsWorkspaceModalOpen(true)}>
+              Workspaces ▾
+            </button>
+          </nav>
+        )}
+
         <div className="topbar-right">
           {/* Real Authentication State: Account Menu or Sign In CTA */}
           {currentUser ? (
             <AccountMenu
               user={currentUser}
               currentRoute={currentRoute}
-              onNavigate={(route) => navigateTo(route)}
+              onNavigate={(route) => {
+                if (['founder', 'investor', 'admin', 'dashboard'].includes(route)) {
+                  switchWorkspaceWithTransition(route === 'admin' ? 'admin-overview' : (route as KnownRoute));
+                } else {
+                  navigateTo(route === 'admin' ? 'admin-overview' : (route as KnownRoute));
+                }
+              }}
               onOpenWorkspaces={() => setIsWorkspaceModalOpen(true)}
               onLogout={handleLogout}
             />
@@ -728,10 +916,25 @@ export const App: React.FC = () => {
             setSelectedDetailStartup(startup);
             navigateTo('discovery');
           }}
-          onNavigateToDiscovery={() => navigateTo('discovery')}
+          onNavigateToDiscovery={() => switchWorkspaceWithTransition('discovery')}
           onOpenWorkspaces={() => setIsWorkspaceModalOpen(true)}
-          onNavigateToFounder={() => navigateTo('founder')}
-          onNavigateToInvestor={() => navigateTo('investor')}
+          onNavigateToFounder={() => switchWorkspaceWithTransition('founder')}
+          onNavigateToInvestor={() => switchWorkspaceWithTransition('investor')}
+          onNavigateToArchive={(tab = 'seasons') => {
+            setArchiveInitialTab(tab);
+            navigateTo('archive');
+          }}
+          onOpenCompare={() => setIsMatrixOpen(true)}
+        />
+      )}
+
+      {currentRoute === 'archive' && (
+        <HistoricalArchivePage
+          onNavigateToDiscovery={() => navigateTo('discovery')}
+          onSelectStartup={(startup) => setSelectedDetailStartup(startup)}
+          onToggleCompare={handleToggleCompare}
+          selectedForCompare={selectedForCompare}
+          initialTab={archiveInitialTab}
         />
       )}
 
@@ -740,8 +943,11 @@ export const App: React.FC = () => {
       {isInitialAuthDone && currentRoute === 'founder' && (
         currentUser && hasRole('FOUNDER') ? (
           <FounderWorkspace
+            currentUser={currentUser}
             onNavigateToConnections={() => navigateTo('connections')}
-            onNavigateToDiscovery={() => navigateTo('discovery')}
+            onNavigateToDiscovery={() => switchWorkspaceWithTransition('discovery')}
+            onNavigateToInvestor={() => switchWorkspaceWithTransition('investor')}
+            onOpenWorkspaces={() => setIsWorkspaceModalOpen(true)}
           />
         ) : (
           <WorkspaceGate {...gateProps} kind="founder" />
@@ -751,8 +957,11 @@ export const App: React.FC = () => {
       {isInitialAuthDone && currentRoute === 'investor' && (
         currentUser && hasRole('INVESTOR') ? (
           <InvestorWorkspace
+            currentUser={currentUser}
             onNavigateToConnections={() => navigateTo('connections')}
-            onNavigateToDiscovery={() => navigateTo('discovery')}
+            onNavigateToDiscovery={() => switchWorkspaceWithTransition('discovery')}
+            onNavigateToFounder={() => switchWorkspaceWithTransition('founder')}
+            onOpenWorkspaces={() => setIsWorkspaceModalOpen(true)}
           />
         ) : (
           <WorkspaceGate {...gateProps} kind="investor" />
@@ -788,7 +997,13 @@ export const App: React.FC = () => {
         currentRoute={currentRoute}
         currentUser={currentUser}
         onClose={() => setIsDrawerOpen(false)}
-        onNavigate={(route) => navigateTo(route)}
+        onNavigate={(route) => {
+          if (['founder', 'investor', 'admin', 'dashboard', 'discovery'].includes(route)) {
+            switchWorkspaceWithTransition(route === 'admin' ? 'admin-overview' : (route as KnownRoute));
+          } else {
+            navigateTo(route === 'admin' ? 'admin-overview' : (route as KnownRoute));
+          }
+        }}
         onOpenWorkspaces={() => setIsWorkspaceModalOpen(true)}
         onSignIn={() => navigateTo('login')}
         onLogout={handleLogout}
@@ -803,7 +1018,11 @@ export const App: React.FC = () => {
           onClose={() => setIsWorkspaceModalOpen(false)}
           onSelectWorkspace={(workspace) => {
             setIsWorkspaceModalOpen(false);
-            navigateTo(workspace);
+            if (['founder', 'investor', 'admin', 'dashboard', 'discovery'].includes(workspace)) {
+              switchWorkspaceWithTransition(workspace === 'admin' ? 'admin-overview' : (workspace as KnownRoute));
+            } else {
+              navigateTo(workspace as KnownRoute);
+            }
           }}
           onRolesUpdated={(updatedRoles) => {
             setCurrentUser((prev) => (prev ? { ...prev, roles: updatedRoles } : null));
@@ -1139,6 +1358,8 @@ export const App: React.FC = () => {
           <span className="footer-meta">© 2026 SAUDA · THE STARTUP EXCHANGE</span>
         </div>
       </footer>
+        </>
+      )}
 
       {/* 5. STARTUP DETAIL MODAL */}
       <StartupDetailModal
@@ -1161,8 +1382,6 @@ export const App: React.FC = () => {
         onClose={() => setIsMatrixOpen(false)}
         onRemoveStartup={handleRemoveCompare}
       />
-        </>
-      )}
     </main>
   );
 };

@@ -128,7 +128,7 @@
 
 .workspace-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
 }
 
@@ -201,6 +201,29 @@
   background: rgba(14, 165, 233, 0.12);
   border-color: rgba(14, 165, 233, 0.3);
   color: #38bdf8;
+}
+
+.workspace-card-icon.slate-icon {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #E2E8F0;
+}
+
+.workspace-card.admin-card {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.workspace-action-btn.admin-btn {
+  background: linear-gradient(135deg, #1E293B, #0F172A);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #F8FAFC;
+}
+
+.workspace-action-btn.admin-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #334155, #1E293B);
+  border-color: rgba(195, 160, 100, 0.6);
+  color: #FFFFFF;
 }
 
 .workspace-card-title {

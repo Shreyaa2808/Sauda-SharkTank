@@ -10,6 +10,9 @@ import type {
   ConversationDetail,
   ChatMessageItem,
   FounderReviewEvent,
+  FounderProfileData,
+  InvestorProfileData,
+  ArchiveSummary,
 } from '../types/workspace.ts';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -177,6 +180,95 @@ export async function updateFounderPitch(
   }
 }
 
+export async function archiveFounderPitch(
+  pitchId: number,
+): Promise<{ ok: true; pitch: FounderPitch; summary: ArchiveSummary; message: string } | { ok: false; error: string; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/founder/pitches/${pitchId}/archive`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: data.error || 'ARCHIVE_FAILED',
+        message: data.message || 'Failed to archive pitch.',
+      };
+    }
+
+    return {
+      ok: true,
+      pitch: data.pitch,
+      summary: data.summary,
+      message: data.message || 'Pitch archived successfully.',
+    };
+  } catch {
+    return {
+      ok: false,
+      error: 'NETWORK_ERROR',
+      message: 'Network error connecting to the Sauda server.',
+    };
+  }
+}
+
+export async function fetchFounderProfile(signal?: AbortSignal): Promise<FounderProfileData> {
+  const res = await fetch(`${API_BASE_URL}/api/founder/profile`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || `Failed to fetch founder profile: ${res.status}`);
+  }
+  return data.profile as FounderProfileData;
+}
+
+export async function updateFounderProfile(
+  payload: Partial<FounderProfileData>,
+): Promise<{ ok: true; profile: FounderProfileData; message: string } | { ok: false; error: string; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/founder/profile`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: data.error || 'UPDATE_PROFILE_FAILED',
+        message: data.message || 'Failed to update founder profile.',
+      };
+    }
+
+    return {
+      ok: true,
+      profile: data.profile,
+      message: data.message || 'Founder profile updated successfully.',
+    };
+  } catch {
+    return {
+      ok: false,
+      error: 'NETWORK_ERROR',
+      message: 'Network error connecting to the Sauda server.',
+    };
+  }
+}
+
 // ============================================================================
 // INVESTOR SERVICE
 // ============================================================================
@@ -250,6 +342,58 @@ export async function toggleInvestorWatchlist(
     }
 
     return { ok: true, saved: data.saved };
+  } catch {
+    return {
+      ok: false,
+      error: 'NETWORK_ERROR',
+      message: 'Network error connecting to the Sauda server.',
+    };
+  }
+}
+
+export async function fetchInvestorProfile(signal?: AbortSignal): Promise<InvestorProfileData> {
+  const res = await fetch(`${API_BASE_URL}/api/investor/profile`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || `Failed to fetch investor profile: ${res.status}`);
+  }
+  return data.profile as InvestorProfileData;
+}
+
+export async function updateInvestorProfile(
+  payload: Partial<InvestorProfileData>,
+): Promise<{ ok: true; profile: InvestorProfileData; message: string } | { ok: false; error: string; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/investor/profile`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: data.error || 'UPDATE_PROFILE_FAILED',
+        message: data.message || 'Failed to update investor preferences.',
+      };
+    }
+
+    return {
+      ok: true,
+      profile: data.profile,
+      message: data.message || 'Investor preferences updated successfully.',
+    };
   } catch {
     return {
       ok: false,
@@ -382,6 +526,44 @@ export async function endConnection(
     }
 
     return { ok: true, request: data.request };
+  } catch {
+    return {
+      ok: false,
+      error: 'NETWORK_ERROR',
+      message: 'Network error connecting to the Sauda server.',
+    };
+  }
+}
+
+export async function withdrawConnectionRequest(
+  requestId: number,
+  reason?: string,
+): Promise<{ ok: true; request: ConnectionRequestItem; message: string } | { ok: false; error: string; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/connections/${requestId}/withdraw`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ reason: reason?.trim() || undefined }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: data.error || 'WITHDRAW_FAILED',
+        message: data.message || 'Failed to withdraw connection request.',
+      };
+    }
+
+    return {
+      ok: true,
+      request: data.request,
+      message: data.message || 'Connection request withdrawn.',
+    };
   } catch {
     return {
       ok: false,

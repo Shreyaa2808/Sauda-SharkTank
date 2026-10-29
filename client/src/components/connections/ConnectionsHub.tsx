@@ -7,6 +7,7 @@ import {
   fetchConnections,
   respondToConnectionRequest,
   endConnection,
+  withdrawConnectionRequest,
   fetchConversation,
   sendChatMessage,
 } from '../../services/workspace.ts';
@@ -43,6 +44,12 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
   // Ending Connection Modal / Confirmation
   const [isEndModalOpen, setIsEndModalOpen] = useState<boolean>(false);
   const [endSubmitting, setEndSubmitting] = useState<boolean>(false);
+
+  // Withdrawing Pending Request Modal / Confirmation
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState<boolean>(false);
+  const [withdrawReason, setWithdrawReason] = useState<string>('');
+  const [withdrawSubmitting, setWithdrawSubmitting] = useState<boolean>(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   // Ref to chat feed for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -231,6 +238,24 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
       await loadConnections(false);
     } else {
       alert(`Failed to end connection: ${res.message}`);
+    }
+  };
+
+  const handleWithdrawRequest = async () => {
+    if (!selectedRequest) return;
+    setWithdrawSubmitting(true);
+    setWithdrawError(null);
+
+    const res = await withdrawConnectionRequest(selectedRequest.requestId, withdrawReason);
+    setWithdrawSubmitting(false);
+
+    if (res.ok) {
+      setIsWithdrawModalOpen(false);
+      setWithdrawReason('');
+      setSelectedRequest(res.request);
+      await loadConnections(false);
+    } else {
+      setWithdrawError(res.message);
     }
   };
 
@@ -433,7 +458,7 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                 </div>
               )}
 
-              {/* Action Buttons: Only the recipient founder can accept/decline */}
+              {/* Action Buttons: Only the recipient founder can accept/decline; requesting investor can withdraw */}
               {currentUser?.userId === selectedRequest.founderUserId ? (
                 <div className="pending-action-bar">
                   <button
@@ -451,9 +476,26 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                     Accept Connection & Open Chat →
                   </button>
                 </div>
+              ) : currentUser?.userId === selectedRequest.investorUserId ? (
+                <div className="pending-investor-action-bar">
+                  <div className="pending-awaiting-bar">
+                    ⏳ Awaiting response from {selectedRequest.founderName}. You will be notified once the founder accepts.
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-withdraw-req"
+                    onClick={() => {
+                      setWithdrawReason('');
+                      setWithdrawError(null);
+                      setIsWithdrawModalOpen(true);
+                    }}
+                  >
+                    Withdraw Request
+                  </button>
+                </div>
               ) : (
                 <div className="pending-awaiting-bar">
-                  ⏳ Awaiting response from {selectedRequest.founderName}. You will be notified once the founder accepts.
+                  ⏳ Awaiting response from {selectedRequest.founderName}.
                 </div>
               )}
             </div>
@@ -595,6 +637,59 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
                 onClick={handleEndConnection}
               >
                 {endSubmitting ? 'Ending...' : 'Yes, End Connection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Withdraw Connection Request Confirmation Modal */}
+      {isWithdrawModalOpen && selectedRequest && (
+        <div className="modal-overlay-danger" onClick={() => !withdrawSubmitting && setIsWithdrawModalOpen(false)}>
+          <div
+            className="modal-panel-danger"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="withdraw-modal-title"
+          >
+            <h3 id="withdraw-modal-title">Withdraw Connection Request?</h3>
+            <p>
+              Are you sure you want to withdraw your connection request to <strong>{selectedRequest.founderName}</strong> for <strong>{selectedRequest.brandName}</strong>? The founder will no longer be able to accept it.
+            </p>
+            {withdrawError && (
+              <div className="withdraw-modal-error" role="alert">
+                ⚠️ {withdrawError}
+              </div>
+            )}
+            <div className="withdraw-reason-field">
+              <label htmlFor="withdraw-reason-input">Reason for withdrawal (optional):</label>
+              <input
+                id="withdraw-reason-input"
+                type="text"
+                value={withdrawReason}
+                onChange={(e) => setWithdrawReason(e.target.value)}
+                placeholder="e.g. Allocation completed, investment thesis revised"
+                maxLength={255}
+                disabled={withdrawSubmitting}
+              />
+            </div>
+            <div className="modal-danger-actions">
+              <button
+                type="button"
+                className="btn-cancel"
+                disabled={withdrawSubmitting}
+                onClick={() => setIsWithdrawModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-confirm-withdraw"
+                disabled={withdrawSubmitting}
+                onClick={handleWithdrawRequest}
+              >
+                {withdrawSubmitting ? 'Withdrawing...' : 'Confirm Withdrawal'}
               </button>
             </div>
           </div>

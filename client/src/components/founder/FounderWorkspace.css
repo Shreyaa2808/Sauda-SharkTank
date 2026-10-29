@@ -1052,3 +1052,593 @@
 @media (prefers-reduced-motion: reduce) {
   .founder-review-modal-panel *, .founder-review-modal-panel *::before, .founder-review-modal-panel *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* ==========================================================================
+   FOUNDER WORKSPACE: ENHANCED SECTION NAVIGATION & WORKSPACE SWITCHING
+   ========================================================================== */
+
+.workspace-utility-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.workspace-switcher-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(195, 160, 100, 0.12);
+  border: 1px solid rgba(216, 184, 120, 0.45);
+  color: #F4E5C5;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.role-switch-btn:hover {
+  background: rgba(195, 160, 100, 0.22);
+  border-color: #D8B878;
+  color: #ffffff;
+}
+
+.workspace-chooser-trigger-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #DCE6EE;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.workspace-chooser-trigger-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* Section Sub-Navigation */
+.founder-section-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 28px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(221, 234, 244, 0.12);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.section-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #9EB2C3;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.section-nav-btn:hover {
+  color: #F4E5C5;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.section-nav-btn.active {
+  color: #F4E5C5;
+  background: rgba(195, 160, 100, 0.12);
+  border-color: rgba(216, 184, 120, 0.45);
+}
+
+.section-nav-btn.shortcut {
+  margin-left: auto;
+  color: #85CBE9;
+  border-color: rgba(133, 203, 233, 0.25);
+}
+
+.section-nav-btn.shortcut:hover {
+  background: rgba(133, 203, 233, 0.1);
+  color: #ffffff;
+}
+
+.tab-counter-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  color: #EAF1F7;
+}
+
+.tab-counter-badge.alert {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ff9e91;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Feedback Banners */
+.founder-feedback-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  font-size: 0.9rem;
+}
+
+.founder-feedback-banner.success {
+  background: rgba(22, 163, 74, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #86efac;
+}
+
+.founder-feedback-banner.error {
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.founder-feedback-banner p {
+  margin: 0;
+  flex: 1;
+}
+
+.banner-dismiss-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: currentColor;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.banner-dismiss-btn:hover {
+  opacity: 1;
+}
+
+/* Shortcuts Grid */
+.founder-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.shortcut-card {
+  background: linear-gradient(150deg, rgba(17, 40, 57, 0.88), rgba(9, 27, 41, 0.9));
+  border: 1px solid rgba(184, 207, 224, 0.16);
+  border-radius: 14px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcut-icon {
+  font-size: 1.8rem;
+  margin-bottom: 12px;
+}
+
+.shortcut-card h3 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.15rem;
+  color: #F7F3EA;
+  margin: 0 0 8px 0;
+}
+
+.shortcut-card p {
+  color: #A5B8C8;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0 0 18px 0;
+  flex: 1;
+}
+
+.shortcut-cta-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid rgba(216, 184, 120, 0.45);
+  color: #F4E5C5;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shortcut-cta-btn:hover {
+  background: rgba(195, 160, 100, 0.15);
+  border-color: #D8B878;
+}
+
+/* Recent Pitches Section */
+.founder-recent-section {
+  background: linear-gradient(150deg, rgba(17, 40, 57, 0.96), rgba(9, 27, 41, 0.96));
+  border: 1px solid rgba(184, 207, 224, 0.16);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.recent-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.recent-header h2 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.35rem;
+  color: #F7F3EA;
+  margin: 0;
+}
+
+.view-all-link {
+  background: transparent;
+  border: none;
+  color: #D8B878;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.view-all-link:hover {
+  text-decoration: underline;
+}
+
+.recent-pitches-table-wrapper {
+  overflow-x: auto;
+}
+
+.recent-pitches-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.recent-pitches-table th {
+  text-align: left;
+  padding: 12px 14px;
+  color: #8FA6B8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(221, 234, 244, 0.12);
+}
+
+.recent-pitches-table td {
+  padding: 14px;
+  border-bottom: 1px solid rgba(221, 234, 244, 0.08);
+  color: #EAF1F7;
+  vertical-align: middle;
+}
+
+.cell-sub {
+  display: block;
+  font-size: 0.75rem;
+  color: #8FA6B8;
+}
+
+.align-right {
+  text-align: right;
+}
+
+.table-action-btn {
+  background: transparent;
+  border: 1px solid rgba(184, 207, 224, 0.2);
+  color: #DCE7EF;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: all 0.2s ease;
+}
+
+.table-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.table-action-btn.primary {
+  background: rgba(195, 160, 100, 0.15);
+  border-color: rgba(216, 184, 120, 0.4);
+  color: #F4E5C5;
+}
+
+.table-action-btn.primary:hover {
+  background: #D8B878;
+  color: #071421;
+}
+
+/* Pitch Card Lifecycle Actions */
+.pitch-lifecycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pitch-action-btn {
+  padding: 7px 13px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pitch-action-btn.submit-btn {
+  background: linear-gradient(135deg, #E4C98E, #C7A15D);
+  border: 1px solid #D8B878;
+  color: #101A24;
+}
+
+.pitch-action-btn.submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #F0D9A7, #D4B16F);
+}
+
+.pitch-action-btn.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pitch-action-btn.edit-btn {
+  background: rgba(195, 160, 100, 0.08);
+  border: 1px solid rgba(216, 184, 120, 0.4);
+  color: #E7D2A5;
+}
+
+.pitch-action-btn.edit-btn:hover {
+  background: #D8B878;
+  color: #071421;
+}
+
+.pitch-action-btn.archive-btn {
+  background: transparent;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #f87171;
+}
+
+.pitch-action-btn.archive-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+}
+
+.pitch-action-btn.withdraw-btn {
+  background: rgba(217, 119, 6, 0.15);
+  border: 1px solid rgba(217, 119, 6, 0.4);
+  color: #fbbf24;
+}
+
+.pitch-action-btn.withdraw-btn:hover:not(:disabled) {
+  background: rgba(217, 119, 6, 0.25);
+}
+
+.pitch-action-btn.withdraw-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pitch-action-btn.feedback-btn {
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #7dd3fc;
+}
+
+.pitch-action-btn.feedback-btn:hover {
+  background: rgba(14, 165, 233, 0.22);
+}
+
+.pitch-action-btn.detail-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #DCE6EE;
+}
+
+.pitch-action-btn.detail-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.archive-warning-note {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+/* Founder Profile Section */
+.founder-profile-section {
+  background: linear-gradient(150deg, rgba(17, 40, 57, 0.96), rgba(9, 27, 41, 0.96));
+  border: 1px solid rgba(184, 207, 224, 0.16);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 860px;
+  margin: 0 auto 36px auto;
+}
+
+.section-intro {
+  margin-bottom: 24px;
+}
+
+.section-intro h2 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.55rem;
+  color: #F7F3EA;
+  margin: 0 0 6px 0;
+}
+
+.section-intro p {
+  color: #A5B8C8;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.founder-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.founder-profile-form .form-field label {
+  color: #A9BDCC;
+}
+
+.founder-profile-form .form-field input,
+.founder-profile-form .form-field select,
+.founder-profile-form .form-field textarea {
+  background: rgba(4, 16, 28, 0.75);
+  border-color: rgba(184, 207, 224, 0.22);
+  color: #F7F3EA;
+}
+
+.founder-profile-form .form-field input:focus,
+.founder-profile-form .form-field select:focus,
+.founder-profile-form .form-field textarea:focus {
+  border-color: #D8B878;
+  box-shadow: 0 0 0 3px rgba(216, 184, 120, 0.2);
+}
+
+.profile-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(221, 234, 244, 0.12);
+}
+
+/* Detail Inspection Modal */
+.view-pitch-body {
+  padding: 10px 0 20px 0;
+}
+
+.detail-section {
+  margin-bottom: 20px;
+}
+
+.detail-section h4 {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin: 0 0 8px 0;
+}
+
+.detail-section p {
+  color: #1e293b;
+  line-height: 1.55;
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.detail-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.detail-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.06em;
+}
+
+.detail-grid strong {
+  font-size: 0.92rem;
+  color: #0f172a;
+}
+
+/* Feedback Section Pitches List */
+.feedback-pitches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feedback-card {
+  background: linear-gradient(150deg, rgba(17, 40, 57, 0.96), rgba(9, 27, 41, 0.96));
+  border: 1px solid rgba(184, 207, 224, 0.16);
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.feedback-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.feedback-card-header h3 {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  font-size: 1.25rem;
+  color: #F7F3EA;
+  margin: 0 0 4px 0;
+}
+
+.feedback-meta {
+  font-size: 0.82rem;
+  color: #8FA6B8;
+}
+
+.feedback-card-body {
+  margin-bottom: 16px;
+  color: #A5B8C8;
+  font-size: 0.9rem;
+}
+
+.pending-notice {
+  color: #85CBE9;
+  margin: 0;
+}
+
+.feedback-prompt {
+  margin: 0;
+}
+
+.feedback-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(221, 234, 244, 0.1);
+}
+
