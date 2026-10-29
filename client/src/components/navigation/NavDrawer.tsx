@@ -218,6 +218,24 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
               {renderLink('discovery', 'Startup Discovery', 'discover')}
               {renderLink('archive', 'Shark Tank Archive', 'archive', 'Broadcast seasons, episodes & deals')}
               {currentUser && renderLink('dashboard', 'Dashboard', 'dashboard', 'Your workspace overview')}
+              {currentUser && (
+                <li>
+                  <button
+                    type="button"
+                    className="nav-drawer-link"
+                    onClick={() => {
+                      onClose();
+                      onOpenWorkspaces();
+                    }}
+                  >
+                    <span className="nav-drawer-link-icon"><Icon name="workspaces" /></span>
+                    <span className="nav-drawer-link-text">
+                      <span className="nav-drawer-link-label">Workspaces</span>
+                      <span className="nav-drawer-link-sub">Switch or activate a workspace</span>
+                    </span>
+                  </button>
+                </li>
+              )}
               {currentUser && hasFounder && renderLink('founder', 'Founder Workspace', 'founder')}
               {currentUser && hasInvestor && renderLink('investor', 'Investor Deal Room', 'investor')}
               {currentUser && (hasFounder || hasInvestor) && renderLink('connections', 'Connections', 'connections')}
@@ -244,22 +262,6 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
                 <ul className="nav-drawer-list">
                   {renderLink('profile', 'Profile', 'profile')}
                   {renderLink('settings', 'Account Settings', 'settings')}
-                  <li>
-                    <button
-                      type="button"
-                      className="nav-drawer-link"
-                      onClick={() => {
-                        onClose();
-                        onOpenWorkspaces();
-                      }}
-                    >
-                      <span className="nav-drawer-link-icon"><Icon name="workspaces" /></span>
-                      <span className="nav-drawer-link-text">
-                        <span className="nav-drawer-link-label">Workspaces</span>
-                        <span className="nav-drawer-link-sub">Switch or activate a workspace</span>
-                      </span>
-                    </button>
-                  </li>
                 </ul>
               </>
             ) : (

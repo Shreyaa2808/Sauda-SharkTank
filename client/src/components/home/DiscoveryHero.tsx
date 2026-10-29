@@ -216,28 +216,7 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
 
   useGSAP(
     () => {
-      // Keep the lighting static for reduced-motion users and compact screens.
-      if (reducedMotion || compactScreen) return;
-
-      const spotlight = heroRef.current?.querySelector<HTMLElement>('.home-hero-spotlight');
-      if (!spotlight || !heroRef.current) return;
-
-      gsap.fromTo(
-        spotlight,
-        { xPercent: 0, opacity: 0.82 },
-        {
-          xPercent: 350,
-          opacity: 0.06,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: heroRef.current,
-            start: 'top top',
-            end: 'bottom top',
-            scrub: 1,
-            invalidateOnRefresh: true,
-          },
-        },
-      );
+      // Background animation hooks if needed
     },
     { scope: heroRef, dependencies: [reducedMotion, compactScreen], revertOnUpdate: true },
   );
@@ -261,7 +240,6 @@ export const DiscoveryHero: React.FC<DiscoveryHeroProps> = ({
         )}
         <div className="home-hero-poster" style={{ backgroundImage: `url(${VIDEO_POSTER})` }} />
         <div className="home-hero-shade" />
-        <div className="home-hero-spotlight" />
         <div className="home-hero-lights" />
       </div>
 

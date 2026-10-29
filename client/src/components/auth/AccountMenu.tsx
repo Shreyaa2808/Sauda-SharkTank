@@ -100,39 +100,22 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
   return (
     <div ref={menuRef} className="account-menu-container">
-      {/* Account Menu Trigger Button */}
+      {/* Account Menu Trigger Button - Compact avatar-only button */}
       <button
         ref={triggerRef}
         type="button"
         id="account-menu-trigger-btn"
-        className={`account-menu-trigger ${isOpen ? 'active' : ''}`}
+        className={`account-menu-trigger account-menu-trigger--icon-only ${isOpen ? 'active' : ''}`}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls="account-menu-dropdown"
         aria-label={`Account menu for ${user.fullName}; current workspace ${activeWorkspaceRole}`}
+        title={`${user.fullName} (${activeWorkspaceRole})`}
       >
         <span className="account-trigger-avatar" aria-hidden="true">
           {initial}
         </span>
-        <span className="account-trigger-name">{user.fullName}</span>
-        <span className="account-trigger-role">{activeWorkspaceRole}</span>
-        <svg
-          className={`account-trigger-chevron ${isOpen ? 'rotate' : ''}`}
-          viewBox="0 0 12 12"
-          fill="none"
-          width="10"
-          height="10"
-          aria-hidden="true"
-        >
-          <path
-            d="M2.5 4.5L6 8L9.5 4.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
       </button>
 
       {/* Dropdown Menu Panel */}

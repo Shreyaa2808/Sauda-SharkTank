@@ -765,6 +765,17 @@ export const App: React.FC = () => {
               role="search"
               onSubmit={(e) => { e.preventDefault(); scrollToExplorer(); }}
             >
+              <span className="topbar-search-icon" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
               <input
                 type="search"
                 value={search}
@@ -772,7 +783,16 @@ export const App: React.FC = () => {
                 placeholder="Search startups, sectors, cities…"
                 aria-label="Search startups"
               />
-              <button type="submit" aria-label="Search">⌕</button>
+              {search && (
+                <button
+                  type="button"
+                  className="topbar-search-clear"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
             </form>
           </>
         )}
