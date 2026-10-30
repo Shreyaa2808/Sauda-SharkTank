@@ -13,6 +13,27 @@ interface AdminOverviewProps {
   onNavigate: (section: 'reviews' | 'historical' | 'imports') => void;
 }
 
+interface BarRow { key: string | number; label: string; value: number; sub?: string }
+
+const HBars: React.FC<{ loading: boolean; rows: BarRow[]; empty: string }> = ({ loading, rows, empty }) => {
+  if (loading) return <div className="panel-state-text">Loading chart…</div>;
+  if (rows.length === 0) return <div className="panel-state-text">{empty}</div>;
+  const max = Math.max(...rows.map((r) => r.value), 1);
+  return (
+    <ul className="hbars">
+      {rows.map((r) => (
+        <li key={r.key}>
+          <div className="hbar-head">
+            <span className="hbar-label">{r.label}</span>
+            <span className="hbar-value">{r.value}{r.sub ? <em> · {r.sub}</em> : null}</span>
+          </div>
+          <div className="hbar-track"><span style={{ width: `${(r.value / max) * 100}%` }} /></div>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
 export const AdminOverview: React.FC<AdminOverviewProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +104,39 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({ onNavigate }) => {
   const totalSharks = stats?.sharkActivity.length ?? 0;
   const totalHistoricalPitches = stats?.dealsBySeason.reduce((acc, s) => acc + (Number(s.pitchCount) || 0), 0) ?? 0;
   const totalCompletedDeals = stats?.dealsBySeason.reduce((acc, s) => acc + (Number(s.completedDeals) || 0), 0) ?? 0;
+
+  const seasonBars = (stats?.dealsBySeason ?? []).map((d) => {
+    const completed = Number(d.completedDeals) || 0;
+    const fell = Number(d.fellThroughDeals) || 0;
+    const pending = Number(d.pendingDeals) || 0;
+    const none = Number(d.noRecordedOutcome) || 0;
+    return {
+      seasonId: d.seasonId,
+      seasonNumber: d.seasonNumber,
+      pitchCount: Number(d.pitchCount) || completed + fell + pending + none,
+      segments: [
+        { key: 'completed', label: 'Deal done', value: completed },
+        { key: 'fell', label: 'Fell through', value: fell },
+        { key: 'pending', label: 'Pending', value: pending },
+        { key: 'none', label: 'No outcome', value: none },
+      ],
+    };
+  });
+  const maxSeasonPitches = Math.max(...seasonBars.map((b) => b.pitchCount), 1);
+  const topSectors: BarRow[] = [...(stats?.sectorDistribution ?? [])]
+    .sort((a, b) => Number(b.pitchCount) - Number(a.pitchCount))
+    .slice(0, 6)
+    .map((x) => ({ key: x.industryId, label: x.industryName, value: Number(x.pitchCount) || 0, sub: `${Number(x.completedDeals) || 0} deals` }));
+  const topSharks: BarRow[] = [...(stats?.sharkActivity ?? [])]
+    .sort((a, b) => Number(b.pitchesSeen) - Number(a.pitchesSeen))
+    .slice(0, 6)
+    .map((x) => ({ key: x.sharkId, label: x.displayName, value: Number(x.pitchesSeen) || 0, sub: `${Number(x.completedDealsAssociated) || 0} deals` }));
+  const importTotals = (() => {
+    const ok = recentImports.reduce((a, i) => a + (Number(i.importedRows) || 0), 0);
+    const failed = recentImports.reduce((a, i) => a + (Number(i.failedRows) || 0), 0);
+    const total = ok + failed;
+    return { ok, failed, total, okPct: total ? Math.round((ok / total) * 100) : 0 };
+  })();
 
   return (
     <div className="admin-overview-container">
@@ -198,6 +252,87 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({ onNavigate }) => {
             <strong className="kpi-value">{loading ? '…' : totalHistoricalPitches}</strong>
           </div>
           <span className="kpi-sub">{totalCompletedDeals} completed deals recorded</span>
+        </article>
+      </section>
+
+
+      {/* Visual analytics */}
+      <section className="overview-charts" aria-label="Historical analytics">
+        <article className="chart-card chart-card-wide">
+          <div className="panel-header">
+            <h3>Pitch outcomes by season</h3>
+            <span className="panel-kicker">DEALS</span>
+          </div>
+          {loading ? (
+            <div className="panel-state-text">Loading chart…</div>
+          ) : seasonBars.length === 0 ? (
+            <div className="panel-state-text">No season data recorded yet.</div>
+          ) : (
+            <>
+              <div className="stack-chart" role="img" aria-label="Stacked bars of pitch outcomes per season">
+                {seasonBars.map((b) => (
+                  <div className="stack-col" key={b.seasonId} title={`Season ${b.seasonNumber}: ${b.pitchCount} pitches`}>
+                    <span className="stack-total">{b.pitchCount}</span>
+                    <div className="stack-bar" style={{ height: `${(b.pitchCount / maxSeasonPitches) * 100}%` }}>
+                      {b.segments.map((seg) => (
+                        seg.value > 0 ? (
+                          <span key={seg.key} className={`seg seg-${seg.key}`} style={{ flexGrow: seg.value }} title={`${seg.label}: ${seg.value}`} />
+                        ) : null
+                      ))}
+                    </div>
+                    <span className="stack-label">S{b.seasonNumber}</span>
+                  </div>
+                ))}
+              </div>
+              <ul className="chart-legend">
+                <li><i className="seg-completed" />Deal done</li>
+                <li><i className="seg-fell" />Fell through</li>
+                <li><i className="seg-pending" />Pending</li>
+                <li><i className="seg-none" />No outcome</li>
+              </ul>
+            </>
+          )}
+        </article>
+
+        <article className="chart-card">
+          <div className="panel-header">
+            <h3>Import health</h3>
+            <span className="panel-kicker">CSV</span>
+          </div>
+          {loading ? (
+            <div className="panel-state-text">Loading chart…</div>
+          ) : importTotals.total === 0 ? (
+            <div className="panel-state-text">No imports yet.</div>
+          ) : (
+            <div className="donut-wrap">
+              <svg viewBox="0 0 120 120" className="donut" role="img" aria-label={`${importTotals.okPct}% of imported rows succeeded`}>
+                <circle cx="60" cy="60" r="48" className="donut-track" />
+                <circle cx="60" cy="60" r="48" className="donut-fill" strokeDasharray={`${(importTotals.okPct / 100) * 301.6} 301.6`} transform="rotate(-90 60 60)" />
+                <text x="60" y="58" textAnchor="middle" className="donut-num">{importTotals.okPct}%</text>
+                <text x="60" y="76" textAnchor="middle" className="donut-sub">success</text>
+              </svg>
+              <ul className="chart-legend column">
+                <li><i className="seg-completed" />{importTotals.ok} imported</li>
+                <li><i className="seg-fell" />{importTotals.failed} failed</li>
+              </ul>
+            </div>
+          )}
+        </article>
+
+        <article className="chart-card">
+          <div className="panel-header">
+            <h3>Top sectors</h3>
+            <span className="panel-kicker">PITCHES</span>
+          </div>
+          <HBars loading={loading} rows={topSectors} empty="No sector data yet." />
+        </article>
+
+        <article className="chart-card chart-card-wide">
+          <div className="panel-header">
+            <h3>Most active sharks</h3>
+            <span className="panel-kicker">PITCHES SEEN</span>
+          </div>
+          <HBars loading={loading} rows={topSharks} empty="No shark activity recorded yet." />
         </article>
       </section>
 

@@ -618,6 +618,8 @@ export const App: React.FC = () => {
 
     return (
       <>
+        <CursorGlow />
+        <SlideInObserver />
         {transitionTarget && (
           <WorkspaceTransition
             workspace={transitionTarget.workspace}

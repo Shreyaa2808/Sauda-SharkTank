@@ -217,8 +217,7 @@ export const AdminReviewPage: React.FC<AdminReviewPageProps> = ({ authorized, on
       <header className="admin-review-header">
         <div>
           <span className="admin-review-eyebrow">SAUDA · MODERATION</span>
-          <h1 id="admin-review-title">Pitch Review Queue<span>.</span></h1>
-          <p>Review founder submissions before they appear in the public registry.</p>
+          <h1 id="admin-review-title" className="sr-only">Pitch Review Queue</h1>
         </div>
         <div className="admin-review-header-count" aria-live="polite">
           <strong>{queueLoading ? '—' : queue.length.toString().padStart(2, '0')}</strong>
