@@ -160,6 +160,7 @@ export const SlideInObserver: React.FC = () => {
       '.founder-kpi-card', '.founder-pitch-card', '.founder-profile-section', '.founder-recent-section', '.feedback-card',
       '.investor-deal-card', '.investor-kpi-card', '.breakdown-card', '.investor-preferences-section',
       '.profile-form-card', '.profile-summary-card', '.settings-card', '.settings-actions-card',
+      '.overview-hero-card', '.kpi-card', '.overview-panel', '.chart-card', '.admin-review-queue', '.admin-review-pitch-detail',
     ].join(', ');
     const io = new IntersectionObserver(
       (entries) => {

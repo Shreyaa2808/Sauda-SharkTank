@@ -1,3 +1,4 @@
+
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import fs from 'node:fs';
@@ -69,9 +70,14 @@ export const dbPool = mysql.createPool({
   user,
   password,
   database,
-  ...(ssl ? { ssl } : {}),
   waitForConnections: true,
   connectionLimit,
-  queueLimit: 0
+  queueLimit: 0,
+  timezone: 'Z',
+  ...(ssl ? { ssl } : {})
 });
 
+// Keep CURRENT_TIMESTAMP in UTC for every pooled connection.
+dbPool.pool.on('connection', (conn) => {
+  conn.query("SET time_zone = '+00:00'");
+});

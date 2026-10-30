@@ -524,3 +524,18 @@
     padding: 18px 20px 14px;
   }
 }
+
+/* Headings: global heading colours were turning admin titles dark-on-dark */
+.admin-shell h1, .admin-shell h2, .admin-shell h3, .admin-shell h4 { color: #F8FAFC; }
+
+/* overflow-x:hidden turned the shell into a scroll container and broke the sticky sidebar */
+.admin-shell { overflow-x: clip; }
+.admin-sidebar { align-self: flex-start; }
+
+/* Gentle polish */
+.admin-main-stage { animation: admin-stage-in .5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes admin-stage-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.admin-nav-item { transition: background .2s, transform .2s, border-color .2s; }
+.admin-nav-item:hover { transform: translateX(3px); }
+.admin-topbar { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(12px); background: rgba(11, 17, 32, 0.85); }
+@media (prefers-reduced-motion: reduce) { .admin-main-stage { animation: none; } }
