@@ -17,9 +17,32 @@
   flex-direction: column;
   gap: 16px;
   z-index: 10;
-  transition: all 0.4s ease;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s ease;
   user-select: none;
   box-sizing: border-box;
+  transform-style: preserve-3d;
+  animation: arenaCenterFloat 6s ease-in-out infinite alternate;
+}
+
+@keyframes arenaCenterFloat {
+  0% {
+    transform: translateY(0px) rotateX(1deg) rotateY(-0.8deg);
+  }
+  50% {
+    transform: translateY(-5px) rotateX(-1deg) rotateY(0.8deg);
+  }
+  100% {
+    transform: translateY(-8px) rotateX(1.5deg) rotateY(-0.5deg);
+  }
+}
+
+.central-analytics-card:hover {
+  transform: translateY(-9px) rotateX(0deg) rotateY(0deg) scale(1.015);
+  border-color: rgba(0, 216, 246, 0.65);
+  box-shadow:
+    0 0 65px rgba(0, 216, 246, 0.35),
+    inset 0 0 45px rgba(0, 216, 246, 0.18),
+    0 35px 90px rgba(0, 0, 0, 0.95);
 }
 
 @media (min-width: 1440px) {

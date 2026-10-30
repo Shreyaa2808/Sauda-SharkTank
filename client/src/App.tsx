@@ -289,6 +289,29 @@ export const App: React.FC = () => {
           : null;
   const currentRoute: AppRoute = guardRedirect ?? requestedRoute;
 
+  // Which workspace "world" the user was last in, so Connections can send them back there.
+  const lastWorkspaceRef = React.useRef<'founder' | 'investor' | null>(null);
+  useEffect(() => {
+    if (currentRoute === 'founder' || currentRoute === 'founder-arena') lastWorkspaceRef.current = 'founder';
+    else if (currentRoute === 'investor') lastWorkspaceRef.current = 'investor';
+    else if (currentRoute === 'discovery' || currentRoute === 'dashboard' || currentRoute === 'archive') lastWorkspaceRef.current = null;
+  }, [currentRoute]);
+
+  // Bumped when someone picks their workspace from the menu while already inside it,
+  // which remounts the workspace so it returns to its main page.
+  const [founderResetKey, setFounderResetKey] = useState<number>(0);
+  const [investorResetKey, setInvestorResetKey] = useState<number>(0);
+  const openWorkspaceHome = useCallback(
+    (route: 'founder' | 'investor') => {
+      if (currentRoute === route) {
+        if (route === 'founder') setFounderResetKey((k) => k + 1);
+        else setInvestorResetKey((k) => k + 1);
+        window.scrollTo?.({ top: 0 });
+      }
+    },
+    [currentRoute],
+  );
+
   // Workspace Transition Animation State
   const [transitionTarget, setTransitionTarget] = useState<{
     workspace: WorkspaceType;
@@ -832,10 +855,6 @@ export const App: React.FC = () => {
             <button type="button" className="is-current" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Founder Studio</button>
             <button type="button" onClick={() => navigateTo('founder-arena')}>Battle Arena ⚔</button>
             <button type="button" onClick={() => navigateTo('connections')}>Inbound Inquiries</button>
-            <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Public Explorer ↗</button>
-            <button type="button" className="topbar-ws-picker-btn founder" onClick={() => setIsWorkspaceModalOpen(true)}>
-              Workspaces ▾
-            </button>
           </nav>
         )}
 
@@ -843,10 +862,6 @@ export const App: React.FC = () => {
           <nav className="topbar-links topbar-links--investor" aria-label="Investor Deal Room navigation">
             <button type="button" className="is-current" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Deal Room</button>
             <button type="button" onClick={() => navigateTo('connections')}>Active Inquiries</button>
-            <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Public Explorer ↗</button>
-            <button type="button" className="topbar-ws-picker-btn investor" onClick={() => setIsWorkspaceModalOpen(true)}>
-              Workspaces ▾
-            </button>
           </nav>
         )}
 
@@ -859,10 +874,6 @@ export const App: React.FC = () => {
             {hasRole('INVESTOR') && (
               <button type="button" onClick={() => switchWorkspaceWithTransition('investor')}>Deal Room</button>
             )}
-            <button type="button" onClick={() => switchWorkspaceWithTransition('discovery')}>Public Explorer ↗</button>
-            <button type="button" className="topbar-ws-picker-btn" onClick={() => setIsWorkspaceModalOpen(true)}>
-              Workspaces ▾
-            </button>
           </nav>
         )}
 
@@ -972,7 +983,7 @@ export const App: React.FC = () => {
       {/* FOUNDER BATTLE ARENA ROUTE */}
       {isInitialAuthDone && currentRoute === 'founder-arena' && (
         currentUser && hasRole('FOUNDER') ? (
-          <FounderArenaPage />
+          <FounderArenaPage onBackToWorkspace={() => navigateTo('founder')} />
         ) : (
           <WorkspaceGate {...gateProps} kind="founder" />
         )
@@ -981,6 +992,7 @@ export const App: React.FC = () => {
       {isInitialAuthDone && currentRoute === 'founder' && (
         currentUser && hasRole('FOUNDER') ? (
           <FounderWorkspace
+            key={`founder-${founderResetKey}`}
             currentUser={currentUser}
             onNavigateToConnections={() => navigateTo('connections')}
             onNavigateToDiscovery={() => switchWorkspaceWithTransition('discovery')}
@@ -995,6 +1007,7 @@ export const App: React.FC = () => {
       {isInitialAuthDone && currentRoute === 'investor' && (
         currentUser && hasRole('INVESTOR') ? (
           <InvestorWorkspace
+            key={`investor-${investorResetKey}`}
             currentUser={currentUser}
             onNavigateToConnections={() => navigateTo('connections')}
             onNavigateToDiscovery={() => switchWorkspaceWithTransition('discovery')}
@@ -1010,7 +1023,14 @@ export const App: React.FC = () => {
         currentUser && (hasRole('FOUNDER') || hasRole('INVESTOR')) ? (
           <ConnectionsHub
             currentUser={currentUser}
-            onNavigateToDiscovery={() => navigateTo('discovery')}
+            onNavigateToDiscovery={() => navigateTo(lastWorkspaceRef.current ?? 'discovery')}
+            backLabel={
+              lastWorkspaceRef.current === 'founder'
+                ? 'Back to Founder Workspace'
+                : lastWorkspaceRef.current === 'investor'
+                  ? 'Back to Investor Deal Room'
+                  : 'Back to Startup Discovery'
+            }
           />
         ) : (
           <WorkspaceGate {...gateProps} kind="connections" />
@@ -1036,6 +1056,7 @@ export const App: React.FC = () => {
         currentUser={currentUser}
         onClose={() => setIsDrawerOpen(false)}
         onNavigate={(route) => {
+          if (route === 'founder' || route === 'investor') openWorkspaceHome(route);
           if (['founder', 'investor', 'admin', 'dashboard', 'discovery'].includes(route)) {
             switchWorkspaceWithTransition(route === 'admin' ? 'admin-overview' : (route as KnownRoute));
           } else {
@@ -1056,6 +1077,7 @@ export const App: React.FC = () => {
           onClose={() => setIsWorkspaceModalOpen(false)}
           onSelectWorkspace={(workspace) => {
             setIsWorkspaceModalOpen(false);
+            if (workspace === 'founder' || workspace === 'investor') openWorkspaceHome(workspace);
             if (['founder', 'investor', 'admin', 'dashboard', 'discovery'].includes(workspace)) {
               switchWorkspaceWithTransition(workspace === 'admin' ? 'admin-overview' : (workspace as KnownRoute));
             } else {

@@ -157,7 +157,9 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
   };
 
   const renderLink = (route: DrawerRoute, label: string, icon: Parameters<typeof Icon>[0]['name'], sub?: string) => {
-    const active = currentRoute === route;
+    // Arena and Connections sit inside the founder world, so keep "Founder Workspace" highlighted there.
+    const active =
+      currentRoute === route || (route === 'founder' && currentRoute === 'founder-arena');
     return (
       <li key={route}>
         <a
@@ -241,7 +243,6 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
                 </li>
               )}
               {currentUser && hasFounder && renderLink('founder', 'Founder Workspace', 'founder')}
-              {currentUser && hasFounder && renderLink('founder-arena', 'Founder Battle Arena', 'arena', 'Cinematic Investor Matching')}
               {currentUser && hasInvestor && renderLink('investor', 'Investor Deal Room', 'investor')}
               {currentUser && (hasFounder || hasInvestor) && renderLink('connections', 'Connections', 'connections')}
               {currentUser && hasAdmin && renderLink('admin', 'Admin Console', 'admin', 'Moderation, historical registry & imports')}

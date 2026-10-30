@@ -159,6 +159,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  perspective: 1000px;
 }
 
 /* Animated SVG Energy Streams (Matching cyan energy filaments in Ref 1 & 3) */

@@ -17,9 +17,11 @@ import './ConnectionsHub.css';
 export interface ConnectionsHubProps {
   currentUser: AuthUser | null;
   onNavigateToDiscovery?: () => void;
+  /** Label for the back button (defaults to the public explorer). */
+  backLabel?: string;
 }
 
-export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onNavigateToDiscovery }) => {
+export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onNavigateToDiscovery, backLabel = 'Back to Startup Discovery' }) => {
   const [incoming, setIncoming] = useState<ConnectionRequestItem[]>([]);
   const [sent, setSent] = useState<ConnectionRequestItem[]>([]);
   const [active, setActive] = useState<ConnectionRequestItem[]>([]);
@@ -282,10 +284,10 @@ export const ConnectionsHub: React.FC<ConnectionsHubProps> = ({ currentUser, onN
             type="button"
             className="back-to-discovery-btn"
             onClick={onNavigateToDiscovery}
-            aria-label="Return to Startup Discovery"
+            aria-label={backLabel}
           >
             <span className="back-arrow" aria-hidden="true">←</span>
-            <span>Back to Startup Discovery</span>
+            <span>{backLabel}</span>
           </button>
         </div>
       )}

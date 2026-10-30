@@ -17,7 +17,11 @@ type ArenaWorkflowView = 'dashboard' | 'select' | 'pitch' | 'battle' | 'reveal' 
 
 const LOCAL_STORAGE_BATTLES_KEY = 'sauda_founder_arena_battles';
 
-export const FounderArenaPage: React.FC = () => {
+export interface FounderArenaPageProps {
+  onBackToWorkspace?: () => void;
+}
+
+export const FounderArenaPage: React.FC<FounderArenaPageProps> = ({ onBackToWorkspace }) => {
   const [currentView, setCurrentView] = useState<ArenaWorkflowView>('dashboard');
 
   // Contenders & Pitch state
@@ -95,6 +99,19 @@ export const FounderArenaPage: React.FC = () => {
       {/* 1. DASHBOARD VIEW (Entry Stage) */}
       {currentView === 'dashboard' && (
         <div className="arena-dashboard-container">
+          {onBackToWorkspace && (
+            <div className="arena-back-row">
+              <button
+                type="button"
+                className="back-to-discovery-btn"
+                onClick={onBackToWorkspace}
+                aria-label="Back to Founder Workspace"
+              >
+                <span className="back-arrow" aria-hidden="true">←</span>
+                <span>Back to Founder Workspace</span>
+              </button>
+            </div>
+          )}
           {/* Hero */}
           <section className="arena-hero-section">
             <div className="hero-halo" />

@@ -29,11 +29,8 @@ export interface InvestorWorkspaceProps {
 type InvestorSection = 'overview' | 'discover' | 'watchlist' | 'preferences';
 
 export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
-  currentUser,
   onNavigateToConnections,
   onNavigateToDiscovery,
-  onNavigateToFounder,
-  onOpenWorkspaces,
 }) => {
   // Navigation Section
   const [activeSection, setActiveSection] = useState<InvestorSection>('overview');
@@ -350,8 +347,6 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
     }
   };
 
-  const hasFounderRole = currentUser?.roles?.includes('FOUNDER');
-
   const hasActiveFilters =
     Boolean(search.trim()) ||
     selectedIndustry !== 'ALL' ||
@@ -381,31 +376,6 @@ export const InvestorWorkspace: React.FC<InvestorWorkspaceProps> = ({
             <span>Return to Discovery</span>
           </button>
         )}
-
-        <div className="workspace-switcher-actions">
-          {hasFounderRole && onNavigateToFounder && (
-            <button
-              type="button"
-              className="role-switch-btn"
-              onClick={onNavigateToFounder}
-              title="Switch to your founder pitch studio"
-            >
-              <span className="switch-icon" aria-hidden="true">⇄</span>
-              <span>Switch to Pitch Studio (Founder)</span>
-            </button>
-          )}
-
-          {onOpenWorkspaces && (
-            <button
-              type="button"
-              className="workspace-chooser-trigger-btn"
-              onClick={onOpenWorkspaces}
-              title="Manage and switch workspace suites"
-            >
-              Workspaces ▾
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Main Header Banner */}

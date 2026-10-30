@@ -34,11 +34,8 @@ const CURRENT_YEAR = new Date().getFullYear();
 type FounderSection = 'overview' | 'pitches' | 'feedback' | 'profile';
 
 export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
-  currentUser,
   onNavigateToConnections,
   onNavigateToDiscovery,
-  onNavigateToInvestor,
-  onOpenWorkspaces,
 }) => {
   // Navigation & Subviews
   const [activeSection, setActiveSection] = useState<FounderSection>('overview');
@@ -104,10 +101,10 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
   const [pDateOfBirth, setPDateOfBirth] = useState<string>('');
   const [pPhoneNumber, setPPhoneNumber] = useState<string>('');
   const [pHighestEducation, setPHighestEducation] = useState<string>('');
-  const [pPriorStartupsCount, setPPriorStartupsCount] = useState<number>(0);
+  const [pPriorStartupsCount, setPPriorStartupsCount] = useState<string>('');
   const [pCity, setPCity] = useState<string>('');
   const [pState, setPState] = useState<string>('');
-  const [pCountry, setPCountry] = useState<string>('India');
+  const [pCountry, setPCountry] = useState<string>('');
 
   // Load Dashboard Data
   const loadData = useCallback(async () => {
@@ -177,10 +174,10 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
       setPDateOfBirth(p.dateOfBirth ? p.dateOfBirth.slice(0, 10) : '');
       setPPhoneNumber(p.phoneNumber || '');
       setPHighestEducation(p.highestEducation || '');
-      setPPriorStartupsCount(p.priorStartupsCount ?? 0);
+      setPPriorStartupsCount(p.phoneNumber ? String(p.priorStartupsCount ?? 0) : '');
       setPCity(p.city || '');
       setPState(p.state || '');
-      setPCountry(p.country || 'India');
+      setPCountry(p.phoneNumber ? p.country || '' : '');
     } catch (err: unknown) {
       setProfileError(err instanceof Error ? err.message : 'Failed to load founder profile.');
     } finally {
@@ -412,36 +409,57 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
     setProfileError(null);
     setProfileSuccess(null);
 
-    if (!pFirstName.trim()) {
-      setProfileError('First name is required.');
+    const missing: string[] = [];
+    if (!pFirstName.trim()) missing.push('First name');
+    if (!pLastName.trim()) missing.push('Last name');
+    if (!pGender.trim()) missing.push('Gender');
+    if (!pDateOfBirth.trim()) missing.push('Date of birth');
+    if (!pPhoneNumber.trim()) missing.push('Phone number');
+    if (!pHighestEducation.trim()) missing.push('Highest education');
+    if (pPriorStartupsCount.trim() === '') missing.push('Prior startups founded');
+    if (!pCity.trim()) missing.push('City');
+    if (!pState.trim()) missing.push('State');
+    if (!pCountry.trim()) missing.push('Country');
+
+    if (missing.length > 0) {
+      setProfileError(`Please fill in all required details before saving: ${missing.join(', ')}.`);
       return;
     }
 
-    if (pPhoneNumber.trim()) {
-      const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{5,20}$/;
-      if (!phoneRegex.test(pPhoneNumber.trim()) || pPhoneNumber.trim().length > 25) {
-        setProfileError('Please provide a valid phone number (e.g. +91 98765 43210).');
-        return;
-      }
+    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{5,20}$/;
+    if (!phoneRegex.test(pPhoneNumber.trim()) || pPhoneNumber.trim().length > 25) {
+      setProfileError('Please provide a valid phone number (e.g. +91 98765 43210).');
+      return;
     }
 
-    if (pDateOfBirth.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(pDateOfBirth.trim())) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pDateOfBirth.trim())) {
       setProfileError('Date of birth must be a valid YYYY-MM-DD date.');
+      return;
+    }
+
+    if (pDateOfBirth.trim() > new Date().toISOString().slice(0, 10)) {
+      setProfileError('Date of birth cannot be in the future.');
+      return;
+    }
+
+    const priorCount = Number(pPriorStartupsCount);
+    if (!Number.isFinite(priorCount) || priorCount < 0) {
+      setProfileError('Prior startups founded must be 0 or more.');
       return;
     }
 
     setProfileSaving(true);
     const payload: Partial<FounderProfileData> = {
       firstName: pFirstName.trim(),
-      lastName: pLastName.trim() || null,
-      gender: pGender.trim() || null,
-      dateOfBirth: pDateOfBirth.trim() || null,
-      phoneNumber: pPhoneNumber.trim() || null,
-      highestEducation: pHighestEducation.trim() || null,
-      priorStartupsCount: Math.max(0, Math.floor(Number(pPriorStartupsCount) || 0)),
-      city: pCity.trim() || null,
-      state: pState.trim() || null,
-      country: pCountry.trim() || 'India',
+      lastName: pLastName.trim(),
+      gender: pGender.trim(),
+      dateOfBirth: pDateOfBirth.trim(),
+      phoneNumber: pPhoneNumber.trim(),
+      highestEducation: pHighestEducation.trim(),
+      priorStartupsCount: Math.floor(priorCount),
+      city: pCity.trim(),
+      state: pState.trim(),
+      country: pCountry.trim(),
     };
 
     const res = await updateFounderProfile(payload);
@@ -463,7 +481,6 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
 
   const pitchesNeedingRevision = pitches.filter((p) => p.pitchStatus === 'REJECTED');
 
-  const hasInvestorRole = currentUser?.roles?.includes('INVESTOR');
 
   return (
     <div className="founder-workspace-container">
@@ -480,31 +497,6 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
             <span>Return to Discovery</span>
           </button>
         )}
-
-        <div className="workspace-switcher-actions">
-          {hasInvestorRole && onNavigateToInvestor && (
-            <button
-              type="button"
-              className="role-switch-btn"
-              onClick={onNavigateToInvestor}
-              title="Switch to your investor deal room"
-            >
-              <span className="switch-icon" aria-hidden="true">⇄</span>
-              <span>Switch to Deal Room (Investor)</span>
-            </button>
-          )}
-
-          {onOpenWorkspaces && (
-            <button
-              type="button"
-              className="workspace-chooser-trigger-btn"
-              onClick={onOpenWorkspaces}
-              title="Manage and switch workspace roles"
-            >
-              Workspaces ▾
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Main Header Banner */}
@@ -1153,13 +1145,14 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
               <p>Loading founder profile...</p>
             </div>
           ) : (
-            <form onSubmit={handleProfileSave} className="founder-profile-form">
+            <form onSubmit={handleProfileSave} autoComplete="off" className="founder-profile-form">
               <div className="form-grid-two">
                 <div className="form-field">
-                  <label htmlFor="p-first-name">First Name *</label>
+                  <label htmlFor="p-first-name">First Name <span className="req">*</span></label>
                   <input
                     id="p-first-name"
                     type="text"
+                    placeholder="e.g. Arpita"
                     required
                     maxLength={80}
                     value={pFirstName}
@@ -1169,13 +1162,15 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="p-last-name">Last Name</label>
+                  <label htmlFor="p-last-name">Last Name <span className="req">*</span></label>
                   <input
                     id="p-last-name"
                     type="text"
+                    placeholder="e.g. Sharma"
                     maxLength={80}
                     value={pLastName}
                     onChange={(e) => setPLastName(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>
@@ -1183,7 +1178,7 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
 
               <div className="form-grid-three">
                 <div className="form-field">
-                  <label htmlFor="p-gender">Gender</label>
+                  <label htmlFor="p-gender">Gender <span className="req">*</span></label>
                   <input
                     id="p-gender"
                     type="text"
@@ -1191,23 +1186,26 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
                     placeholder="e.g. Female, Male, Non-binary"
                     value={pGender}
                     onChange={(e) => setPGender(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="p-dob">Date of Birth</label>
+                  <label htmlFor="p-dob">Date of Birth <span className="req">*</span></label>
                   <input
                     id="p-dob"
                     type="date"
+                    max={new Date().toISOString().slice(0, 10)}
                     value={pDateOfBirth}
                     onChange={(e) => setPDateOfBirth(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="p-phone">Phone Number</label>
+                  <label htmlFor="p-phone">Phone Number <span className="req">*</span></label>
                   <input
                     id="p-phone"
                     type="tel"
@@ -1215,6 +1213,7 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
                     placeholder="+91 98765 43210"
                     value={pPhoneNumber}
                     onChange={(e) => setPPhoneNumber(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>
@@ -1222,7 +1221,7 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
 
               <div className="form-grid-two">
                 <div className="form-field">
-                  <label htmlFor="p-education">Highest Education</label>
+                  <label htmlFor="p-education">Highest Education <span className="req">*</span></label>
                   <input
                     id="p-education"
                     type="text"
@@ -1230,19 +1229,22 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
                     placeholder="e.g. B.Tech Computer Science, MBA"
                     value={pHighestEducation}
                     onChange={(e) => setPHighestEducation(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="p-prior-startups">Prior Startups Founded</label>
+                  <label htmlFor="p-prior-startups">Prior Startups Founded <span className="req">*</span></label>
                   <input
                     id="p-prior-startups"
                     type="number"
+                    placeholder="e.g. 0"
                     min="0"
                     step="1"
                     value={pPriorStartupsCount}
-                    onChange={(e) => setPPriorStartupsCount(Number(e.target.value))}
+                    onChange={(e) => setPPriorStartupsCount(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>
@@ -1250,7 +1252,7 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
 
               <div className="form-grid-three">
                 <div className="form-field">
-                  <label htmlFor="p-city">City</label>
+                  <label htmlFor="p-city">City <span className="req">*</span></label>
                   <input
                     id="p-city"
                     type="text"
@@ -1258,12 +1260,13 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
                     placeholder="e.g. Mumbai"
                     value={pCity}
                     onChange={(e) => setPCity(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="p-state">State</label>
+                  <label htmlFor="p-state">State <span className="req">*</span></label>
                   <input
                     id="p-state"
                     type="text"
@@ -1271,12 +1274,13 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
                     placeholder="e.g. Maharashtra"
                     value={pState}
                     onChange={(e) => setPState(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="p-country">Country</label>
+                  <label htmlFor="p-country">Country <span className="req">*</span></label>
                   <input
                     id="p-country"
                     type="text"
@@ -1284,6 +1288,7 @@ export const FounderWorkspace: React.FC<FounderWorkspaceProps> = ({
                     placeholder="e.g. India"
                     value={pCountry}
                     onChange={(e) => setPCountry(e.target.value)}
+                    required
                     disabled={profileSaving}
                   />
                 </div>

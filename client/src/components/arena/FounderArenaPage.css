@@ -390,3 +390,15 @@
   color: #00d8f6;
   font-weight: 700;
 }
+
+.arena-back-row {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0;
+}
+
+.arena-back-row .back-to-discovery-btn {
+  padding: 5px 11px;
+  font-size: 11.5px;
+  gap: 6px;
+}

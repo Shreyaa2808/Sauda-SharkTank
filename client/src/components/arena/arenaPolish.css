@@ -782,16 +782,6 @@
   border-radius: 14px;
 }
 
-.step-item {
-  padding: 6px 10px;
-  border-radius: 999px;
-}
-
-.step-item.active {
-  background: rgba(0, 216, 246, 0.1);
-  box-shadow: 0 0 0 1px rgba(0, 216, 246, 0.35);
-}
-
 .step-card {
   border-radius: 18px;
   padding: 32px;
