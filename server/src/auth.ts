@@ -1,3 +1,4 @@
+
 import crypto from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
@@ -42,10 +43,6 @@ const PLACEHOLDER_SECRET_PATTERNS = [
   'default',
 ];
 
-/**
- * Returns a human-readable problem with the configured secret, or null if it is acceptable.
- * The message never contains the secret itself.
- */
 function describeSecretProblem(secret: string | undefined): string | null {
   if (!secret || !secret.trim()) return 'AUTH_SESSION_SECRET is not set.';
   if (secret.length < MIN_SESSION_SECRET_LENGTH) {
@@ -61,10 +58,6 @@ function describeSecretProblem(secret: string | undefined): string | null {
   return null;
 }
 
-/**
- * Validates AUTH_SESSION_SECRET and throws an actionable error (without printing the secret).
- * Called at server startup so the API fails closed instead of signing with a weak/known key.
- */
 export function assertSessionSecretConfigured(): void {
   const problem = describeSecretProblem(process.env.AUTH_SESSION_SECRET);
   if (problem) {
@@ -75,17 +68,11 @@ export function assertSessionSecretConfigured(): void {
   }
 }
 
-/**
- * Get secret for signing session cookies. Never falls back to a built-in default.
- */
 function getSessionSecret(): string {
   assertSessionSecretConfigured();
   return process.env.AUTH_SESSION_SECRET as string;
 }
 
-/**
- * Cryptographically sign a session payload using HMAC-SHA256.
- */
 export function signSession(payload: SessionPayload): string {
   const secret = getSessionSecret();
   const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -93,9 +80,6 @@ export function signSession(payload: SessionPayload): string {
   return `${data}.${signature}`;
 }
 
-/**
- * Verify and parse a signed session string.
- */
 export function verifySession(token: string): SessionPayload | null {
   try {
     const parts = token.split('.');
@@ -105,14 +89,12 @@ export function verifySession(token: string): SessionPayload | null {
     const secret = getSessionSecret();
     const expectedSig = crypto.createHmac('sha256', secret).update(data).digest('base64url');
 
-    // Constant-time comparison to prevent timing attacks
     if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
       return null;
     }
 
     const payload: SessionPayload = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));
 
-    // Check expiration
     if (typeof payload.exp !== 'number' || payload.exp < Math.floor(Date.now() / 1000)) {
       return null;
     }
@@ -123,9 +105,6 @@ export function verifySession(token: string): SessionPayload | null {
   }
 }
 
-/**
- * Helper to parse cookies from Express request.
- */
 function parseCookies(req: Request): Record<string, string> {
   const list: Record<string, string> = {};
   const cookieHeader = req.headers.cookie;
@@ -144,6 +123,7 @@ function parseCookies(req: Request): Record<string, string> {
 
 /**
  * Set signed session cookie on response.
+ * SameSite=None is required for cross-site production API requests.
  */
 export function setSessionCookie(res: Response, payload: SessionPayload): void {
   const signed = signSession(payload);
@@ -151,7 +131,7 @@ export function setSessionCookie(res: Response, payload: SessionPayload): void {
 
   res.cookie(SESSION_COOKIE_NAME, signed, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: isProd ? 'none' : 'lax',
     secure: isProd,
     maxAge: SESSION_MAX_AGE_MS,
     path: '/',
@@ -159,21 +139,19 @@ export function setSessionCookie(res: Response, payload: SessionPayload): void {
 }
 
 /**
- * Clear session cookie on response.
+ * Clear session cookie using the same attributes as cookie creation.
  */
 export function clearSessionCookie(res: Response): void {
   const isProd = process.env.NODE_ENV === 'production';
+
   res.clearCookie(SESSION_COOKIE_NAME, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: isProd ? 'none' : 'lax',
     secure: isProd,
     path: '/',
   });
 }
 
-/**
- * Extract authenticated user session payload from request.
- */
 export function getSessionFromRequest(req: Request): SessionPayload | null {
   const cookies = parseCookies(req);
   const token = cookies[SESSION_COOKIE_NAME];
@@ -186,11 +164,6 @@ export interface VerifyGoogleTokenOptions {
   fetchFn?: typeof fetch;
 }
 
-/**
- * Verify Google ID Token server-side via Google's tokeninfo API.
- * Validates signature, expiry, expected audience (GOOGLE_CLIENT_ID), issuer, valid subject, and email verification.
- * Enforces bounded network timeout and redacts sensitive credentials from log output.
- */
 export async function verifyGoogleIdToken(
   idToken: string,
   options: VerifyGoogleTokenOptions = {},
@@ -250,7 +223,6 @@ export async function verifyGoogleIdToken(
 
     const claims = (await response.json()) as Record<string, unknown>;
 
-    // 1. Audience verification (must match GOOGLE_CLIENT_ID)
     if (claims.aud !== expectedClientId) {
       return {
         success: false,
@@ -260,7 +232,6 @@ export async function verifyGoogleIdToken(
       };
     }
 
-    // 2. Issuer verification
     const validIssuers = ['accounts.google.com', 'https://accounts.google.com'];
     if (typeof claims.iss !== 'string' || !validIssuers.includes(claims.iss)) {
       return {
@@ -271,7 +242,6 @@ export async function verifyGoogleIdToken(
       };
     }
 
-    // 3. Expiry verification
     const exp = Number(claims.exp);
     if (!exp || exp < Math.floor(Date.now() / 1000)) {
       return {
@@ -282,7 +252,6 @@ export async function verifyGoogleIdToken(
       };
     }
 
-    // 4. Subject validation
     const sub = typeof claims.sub === 'string' ? claims.sub.trim() : '';
     if (!sub) {
       return {
@@ -293,7 +262,6 @@ export async function verifyGoogleIdToken(
       };
     }
 
-    // 5. Email verification status
     const emailVerified = claims.email_verified === 'true' || claims.email_verified === true;
     if (!emailVerified) {
       return {
@@ -319,12 +287,7 @@ export async function verifyGoogleIdToken(
 
     return {
       success: true,
-      profile: {
-        sub,
-        email,
-        name,
-        picture,
-      },
+      profile: { sub, email, name, picture },
     };
   } catch (err: any) {
     clearTimeout(timer);
@@ -343,7 +306,6 @@ export async function verifyGoogleIdToken(
       };
     }
 
-    // Never log raw tokens, payload details, or secrets
     console.error('[Auth] Error contacting Google token verification service:', err?.message || 'Network error');
     return {
       success: false,
@@ -354,17 +316,12 @@ export async function verifyGoogleIdToken(
   }
 }
 
-/**
- * Look up existing user by Google subject, or provision a new user with default VIEWER role.
- * Enforces rule: never auto-link accounts with matching email; require explicit linking.
- */
 export async function authenticateOrProvisionGoogleUser(
   profile: GoogleVerifiedProfile,
 ): Promise<
   | { success: true; user: AuthenticatedUser }
   | { success: false; status: number; error: string; message: string }
 > {
-  // 1. Look up account by Google subject
   const [existingSubjectRows] = await dbPool.execute<RowDataPacket[]>(
     `SELECT u.user_id AS userId,
             u.full_name AS fullName,
@@ -405,7 +362,6 @@ export async function authenticateOrProvisionGoogleUser(
     };
   }
 
-  // 2. Check if verified email belongs to an existing account without Google subject
   const [existingEmailRows] = await dbPool.execute<RowDataPacket[]>(
     `SELECT user_id AS userId, email, google_subject AS googleSubject, account_status AS accountStatus
      FROM app_user
@@ -414,7 +370,6 @@ export async function authenticateOrProvisionGoogleUser(
   );
 
   if (existingEmailRows.length > 0) {
-    // DO NOT auto-link accounts solely because their email addresses match!
     return {
       success: false,
       status: 409,
@@ -425,12 +380,10 @@ export async function authenticateOrProvisionGoogleUser(
     };
   }
 
-  // 3. New account registration: Create user with Google identity and assign VIEWER role in transaction
   const conn = await dbPool.getConnection();
   try {
     await conn.beginTransaction();
 
-    // Look up role_id for VIEWER by name first; there is no numeric fallback.
     const [viewerRoleRows] = await conn.execute<RowDataPacket[]>(
       `SELECT role_id AS roleId FROM app_role WHERE role_name = 'VIEWER'`,
     );
@@ -456,7 +409,6 @@ export async function authenticateOrProvisionGoogleUser(
 
     const newUserId = insertResult.insertId;
 
-    // Assign default VIEWER role (normal users never assign themselves ADMIN, FOUNDER, or INVESTOR during Google auth)
     await conn.execute(
       `INSERT INTO user_role (user_id, role_id) VALUES (?, ?)`,
       [newUserId, viewerRoleId],
@@ -488,9 +440,6 @@ export async function authenticateOrProvisionGoogleUser(
   }
 }
 
-/**
- * Fetch authenticated user details from database by session userId.
- */
 export async function getAuthenticatedUser(userId: number): Promise<AuthenticatedUser | null> {
   const [rows] = await dbPool.execute<RowDataPacket[]>(
     `SELECT u.user_id AS userId,
@@ -539,9 +488,6 @@ function maskSubject(sub: string | null): string | null {
   return sub.slice(0, 4) + '••••••••••••' + sub.slice(-4);
 }
 
-/**
- * Fetch complete user profile for authenticated account.
- */
 export async function getUserProfile(userId: number): Promise<UserProfile | null> {
   const [rows] = await dbPool.execute<RowDataPacket[]>(
     `SELECT u.user_id AS userId,
@@ -579,10 +525,6 @@ export async function getUserProfile(userId: number): Promise<UserProfile | null
   };
 }
 
-/**
- * Update editable profile attributes (fullName, phoneNumber) for the authenticated user.
- * Disallows updating email, roles, status, google_subject, or created_at.
- */
 export async function updateUserProfile(
   userId: number,
   data: { fullName: string; phoneNumber?: string | null },
@@ -663,11 +605,6 @@ export async function updateUserProfile(
   };
 }
 
-/**
- * Self-service activation of workspace roles (FOUNDER or INVESTOR).
- * Strictly forbids self-assignment of ADMIN role (returns 403).
- * Idempotently assigns the role and links corresponding profile in founder/investor tables.
- */
 export async function activateUserRole(
   userId: number,
   roleName: string,
@@ -692,7 +629,6 @@ export async function activateUserRole(
     };
   }
 
-  // Retrieve user record
   const [userRows] = await dbPool.execute<RowDataPacket[]>(
     `SELECT user_id AS userId, full_name AS fullName, email, account_status AS accountStatus FROM app_user WHERE user_id = ?`,
     [userId],
@@ -716,7 +652,6 @@ export async function activateUserRole(
   try {
     await conn.beginTransaction();
 
-    // Look up role_id from app_role
     const [roleRows] = await conn.execute<RowDataPacket[]>(
       `SELECT role_id FROM app_role WHERE role_name = ?`,
       [normalizedRole],
@@ -734,13 +669,11 @@ export async function activateUserRole(
 
     const roleId = roleRows[0].role_id;
 
-    // Idempotent assignment to user_role
     await conn.execute(
       `INSERT IGNORE INTO user_role (user_id, role_id) VALUES (?, ?)`,
       [userId, roleId],
     );
 
-    // Ensure linked profile exists to satisfy connection_request foreign keys
     if (normalizedRole === 'FOUNDER') {
       await conn.execute(
         `INSERT INTO founder (user_id, first_name, last_name, email)
@@ -759,7 +692,6 @@ export async function activateUserRole(
 
     await conn.commit();
 
-    // Query updated roles
     const [rolesResult] = await dbPool.execute<RowDataPacket[]>(
       `SELECT r.role_name
        FROM user_role ur
@@ -788,4 +720,3 @@ export async function activateUserRole(
     conn.release();
   }
 }
-
