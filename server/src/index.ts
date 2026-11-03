@@ -1,10 +1,10 @@
-
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import type { RowDataPacket } from 'mysql2';
 import { dbPool } from './db.js';
+import { convertToXML } from './utils/xmlConverter.js';
 import {
   verifyGoogleIdToken,
   authenticateOrProvisionGoogleUser,
@@ -98,7 +98,21 @@ const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
 app.use(helmet());
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.FRONTEND_URL,
+].filter((origin): origin is string => Boolean(origin));
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
 // Bound request bodies; oversized payloads are rejected with 413 (see error handler below).
 app.use(express.json({ limit: '100kb' }));
 
@@ -132,6 +146,81 @@ app.get('/api/health/db', async (_req, res) => {
   }
 });
 
+// ============================================================================
+// SECTION F - XML OUTPUT (Query 1)
+// ============================================================================
+
+app.get('/api/xml/query1', async (_req, res) => {
+  try {
+    const [rows] = await dbPool.query<RowDataPacket[]>(
+      'SELECT * FROM company'
+    );
+
+    const xml = convertToXML(rows, 'companies', 'company');
+
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.status(200).send(xml);
+  } catch (error) {
+    console.error('Query 1 XML generation failed:', error);
+    res.status(500).json({
+      error: 'Failed to generate Query 1 XML'
+    });
+  }
+});
+
+
+// XML output for Section A - Query 3
+app.get('/api/xml/query3', async (_req, res) => {
+  try {
+    const [rows] = await dbPool.query<RowDataPacket[]>(
+      'SELECT COUNT(*) AS total_companies FROM company'
+    );
+
+    const xml = convertToXML(
+      rows,
+      'statistics',
+      'statistic'
+    );
+
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.status(200).send(xml);
+  } catch (error) {
+    console.error('Query 3 XML generation failed:', error);
+    res.status(500).json({
+      error: 'Failed to generate Query 3 XML'
+    });
+  }
+});
+
+// XML output for Section A - Query 4
+app.get('/api/xml/query4', async (_req, res) => {
+  try {
+    const [rows] = await dbPool.query<RowDataPacket[]>(
+      `SELECT
+        company_id,
+        brand_name,
+        industry_id,
+        headquarters_state,
+        founded_year
+      FROM company
+      WHERE industry_id = 1`
+    );
+
+    const xml = convertToXML(
+      rows,
+      'companies',
+      'company'
+    );
+
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.status(200).send(xml);
+  } catch (error) {
+    console.error('Query 4 XML generation failed:', error);
+    res.status(500).json({
+      error: 'Failed to generate Query 4 XML'
+    });
+  }
+});
 // ============================================================================
 // AUTHENTICATION ENDPOINTS
 // ============================================================================
